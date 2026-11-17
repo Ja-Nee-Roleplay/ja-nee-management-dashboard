@@ -92,6 +92,12 @@ create table public.dashboard_settings (
  updated_by uuid references public.profiles(id) on delete set null,
  updated_at timestamptz not null default now()
 );
+-- The current frontend stores a versioned workspace document in one RLS-protected row.
+create table public.workspace_state (
+ id text primary key check (id = 'main'), data jsonb not null,
+ updated_by uuid references public.profiles(id) on delete set null,
+ updated_by_client text, updated_at timestamptz not null default now()
+);
 create table public.member_presence (
  profile_id uuid primary key references public.profiles(id) on delete cascade,
  status text not null default 'offline' check(status in ('online','away','offline')),
@@ -134,10 +140,12 @@ alter table public.milestones enable row level security;
 alter table public.announcements enable row level security;
 alter table public.resources enable row level security;
 alter table public.dashboard_settings enable row level security;
+alter table public.workspace_state enable row level security;
 alter table public.member_presence enable row level security;
 alter table public.notifications enable row level security;
 
 create policy "Approved members read profiles" on public.profiles for select to authenticated using(public.is_approved_member());
+create policy "Members read their own profile" on public.profiles for select to authenticated using(id=auth.uid());
 create policy "Owners update profiles" on public.profiles for update to authenticated using(public.current_member_role()='owner') with check(public.current_member_role()='owner');
 create policy "Approved members read board" on public.board_columns for select to authenticated using(public.is_approved_member());
 create policy "Managers manage board" on public.board_columns for all to authenticated using(public.can_manage_workspace()) with check(public.can_manage_workspace());
@@ -166,15 +174,48 @@ create policy "Approved members read resources" on public.resources for select t
 create policy "Managers manage resources" on public.resources for all to authenticated using(public.can_manage_workspace()) with check(public.can_manage_workspace());
 create policy "Approved members read settings" on public.dashboard_settings for select to authenticated using(public.is_approved_member());
 create policy "Owners manage settings" on public.dashboard_settings for all to authenticated using(public.current_member_role()='owner') with check(public.current_member_role()='owner');
+create policy "Approved members read workspace state" on public.workspace_state for select to authenticated using(public.is_approved_member());
+create policy "Approved members create workspace state" on public.workspace_state for insert to authenticated with check(public.is_approved_member());
+create policy "Approved members update workspace state" on public.workspace_state for update to authenticated using(public.is_approved_member()) with check(public.is_approved_member());
 create policy "Approved members read presence" on public.member_presence for select to authenticated using(public.is_approved_member());
 create policy "Members manage own presence" on public.member_presence for all to authenticated using(profile_id=auth.uid() and public.is_approved_member()) with check(profile_id=auth.uid() and public.is_approved_member());
 create policy "Members read own notifications" on public.notifications for select to authenticated using(recipient_id=auth.uid() and public.is_approved_member());
 create policy "Members update own notifications" on public.notifications for update to authenticated using(recipient_id=auth.uid() and public.is_approved_member()) with check(recipient_id=auth.uid() and public.is_approved_member());
+
+grant usage on schema public to authenticated;
+grant select, update on public.profiles to authenticated;
+grant select, insert, update on public.workspace_state to authenticated;
+
+create function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path=public as $$
+declare provider text := coalesce(new.raw_app_meta_data->>'provider','');
+begin
+ insert into public.profiles(id,display_name,username,avatar_url,discord_user_id,github_username)
+ values(
+  new.id,
+  coalesce(nullif(new.raw_user_meta_data->>'user_name',''),nullif(new.raw_user_meta_data->>'preferred_username',''),nullif(new.raw_user_meta_data->>'full_name',''),nullif(new.raw_user_meta_data->>'name',''),nullif(split_part(coalesce(new.email,''),'@',1),''),'Team member'),
+  coalesce(nullif(new.raw_user_meta_data->>'user_name',''),nullif(new.raw_user_meta_data->>'preferred_username','')),
+  coalesce(new.raw_user_meta_data->>'avatar_url',new.raw_user_meta_data->>'picture'),
+  case when provider='discord' then new.raw_user_meta_data->>'provider_id' else null end,
+  case when provider='github' then coalesce(new.raw_user_meta_data->>'user_name',new.raw_user_meta_data->>'preferred_username') else null end
+ ) on conflict(id) do nothing;
+ return new;
+end;
+$$;
+create trigger on_auth_user_created
+ after insert on auth.users for each row execute function public.handle_new_user();
+
+do $$
+begin
+ if not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='workspace_state') then
+  execute 'alter publication supabase_realtime add table public.workspace_state';
+ end if;
+end $$;
 
 insert into public.board_columns(title,color,position)
 select s.title,s.color,s.position from (values
  ('Backlog','#7d8792',0),('To do','#88954a',1),('In progress','#75a252',2),('Under review','#a78753',3),('Completed','#4e956b',4)
 ) as s(title,color,position) where not exists(select 1 from public.board_columns);
 
--- Bootstrap: after OAuth, insert the verified auth.users UUID into profiles as approved owner
--- from a trusted SQL session. Restrict SQL editor access to project owners.
+-- Bootstrap: after the first OAuth sign-in, copy the user's UUID from Authentication → Users,
+-- then set approved=true and role='owner' for that UUID in a trusted SQL editor session.
