@@ -1,0 +1,118 @@
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function mappedKey(variable: string): string | undefined {
+  const raw = Deno.env.get(variable);
+  if (!raw) return undefined;
+  try {
+    const keys = JSON.parse(raw) as Record<string, string>;
+    return keys.default ?? Object.values(keys)[0];
+  } catch {
+    return raw;
+  }
+}
+
+Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const publishableKey = Deno.env.get("SUPABASE_ANON_KEY")
+      ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY")
+      ?? mappedKey("SUPABASE_PUBLISHABLE_KEYS");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+      ?? Deno.env.get("SUPABASE_SECRET_KEY")
+      ?? mappedKey("SUPABASE_SECRET_KEYS");
+    if (!supabaseUrl || !publishableKey || !serviceKey) {
+      console.error("Supabase function keys are unavailable in this runtime.");
+      return json({ error: "Notification service is not configured." }, 500);
+    }
+
+    const authorization = request.headers.get("Authorization") ?? "";
+    const accessToken = authorization.replace(/^Bearer\s+/i, "");
+    if (!accessToken) return json({ error: "Sign in to send workspace notifications." }, 401);
+
+    const caller = createClient(supabaseUrl, publishableKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: authData, error: authError } = await caller.auth.getUser(accessToken);
+    if (authError || !authData.user) return json({ error: "Your session is no longer valid." }, 401);
+
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: profile, error: profileError } = await admin
+      .from("profiles")
+      .select("display_name,approved")
+      .eq("id", authData.user.id)
+      .maybeSingle();
+    if (profileError) {
+      console.error("Could not verify workspace approval:", profileError.message);
+      return json({ error: "Could not verify workspace access." }, 500);
+    }
+    if (!profile?.approved) return json({ error: "An approved workspace account is required." }, 403);
+
+    const webhookUrl = Deno.env.get("DISCORD_WEBHOOK_URL");
+    if (!webhookUrl) return json({ ok: true, skipped: "Discord webhook is not configured yet." });
+    if (!/^https:\/\/discord(?:app)?\.com\/api\/webhooks\//i.test(webhookUrl)) {
+      console.error("DISCORD_WEBHOOK_URL is not a Discord webhook URL.");
+      return json({ error: "The Discord webhook URL is invalid." }, 500);
+    }
+
+    const input = await request.json() as { text?: unknown; assigneeIds?: unknown };
+    const text = typeof input.text === "string" ? input.text.replace(/[\r\n]+/g, " ").trim().slice(0, 850) : "";
+    if (!text) return json({ error: "A change description is required." }, 400);
+    const requestedIds = Array.isArray(input.assigneeIds)
+      ? [...new Set(input.assigneeIds.filter((id): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)))].slice(0, 25)
+      : [];
+
+    let mentionIds: string[] = [];
+    if (requestedIds.length) {
+      const { data: assignees, error: assigneeError } = await admin
+        .from("profiles")
+        .select("discord_user_id")
+        .eq("approved", true)
+        .in("id", requestedIds);
+      if (assigneeError) {
+        console.error("Could not resolve Discord assignees:", assigneeError.message);
+        return json({ error: "Could not look up the assigned team members." }, 500);
+      }
+      mentionIds = [...new Set((assignees ?? [])
+        .map((assignee) => assignee.discord_user_id)
+        .filter((id): id is string => typeof id === "string" && /^\d{17,20}$/.test(id)))];
+    }
+
+    const actor = (profile.display_name || "A teammate").replace(/[\r\n]+/g, " ").slice(0, 80);
+    const mentions = mentionIds.map((id) => `<@${id}>`).join(" ");
+    const content = `**${actor}** ${text}${mentions ? `\nAssigned: ${mentions}` : ""}`.slice(0, 1900);
+    const response = await fetch(`${webhookUrl}${webhookUrl.includes("?") ? "&" : "?"}wait=true`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content,
+        allowed_mentions: { parse: [], users: mentionIds },
+      }),
+    });
+    if (!response.ok) {
+      console.error("Discord webhook returned status:", response.status);
+      return json({ error: "Discord could not accept this change notice." }, 502);
+    }
+    return json({ ok: true });
+  } catch (error) {
+    console.error("Discord notification failed:", error);
+    return json({ error: "Could not send the Discord change notice." }, 500);
+  }
+});
