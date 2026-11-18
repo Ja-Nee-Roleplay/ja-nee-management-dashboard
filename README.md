@@ -21,7 +21,7 @@ The publishable key is intended for browser use. Never put a Supabase secret/ser
 
 1. Create a Supabase project.
 2. Open **SQL Editor**, paste and run [`supabase/schema.sql`](supabase/schema.sql) once. It creates the tables, access rules, profile trigger, and realtime workspace updates.
-3. Run [`supabase/announcements_storage.sql`](supabase/announcements_storage.sql) and [`supabase/weekly_activity_cleanup.sql`](supabase/weekly_activity_cleanup.sql) in the SQL Editor. These create private image storage for announcements and schedule activity-feed cleanup for Mondays at 00:00 South African time. Cleanup clears only `workspace_state.data.events`; tasks and other workspace data are untouched. The cleanup uses Supabase Cron (`pg_cron`).
+3. Run [`supabase/announcements_storage.sql`](supabase/announcements_storage.sql) and [`supabase/weekly_activity_cleanup.sql`](supabase/weekly_activity_cleanup.sql) in the SQL Editor. These create private image storage for announcements, a public image bucket for the optional Discord notification thumbnail, and schedule activity-feed cleanup for Mondays at 00:00 South African time. Cleanup clears only `workspace_state.data.events`; tasks and other workspace data are untouched. The cleanup uses Supabase Cron (`pg_cron`). If you already ran the storage SQL, run its updated version again to add the Discord image bucket.
 4. In **Authentication → URL Configuration**, set the Site URL to the deployed Pages URL:
 
    `https://ja-nee-roleplay.github.io/ja-nee-management-dashboard/`
@@ -46,9 +46,9 @@ The publishable key is intended for browser use. Never put a Supabase secret/ser
 
 Roles are `owner`, `administrator`, `management`, `developer`, and `viewer`.
 
-## Discord change log and assignee mentions
+## Discord task change cards
 
-This dashboard posts a Discord embed after a shared change is saved. It records task, roadmap, announcement, resource, tag, board-column, and workspace-setting changes. Assigned Discord users are pinged in the message text above the embed; the embed shows the change, assignee names, and actor. Each assignee needs a linked Discord User ID. The webhook URL stays in Supabase and is never included in the browser build.
+This dashboard posts a Discord Components V2 card after a task-board change is submitted and saved. The card shows the change summary, assignee names, and who made the change. It does not ping users. The webhook URL stays in Supabase and is never included in the browser build.
 
 1. In your Discord server, open the destination text channel's **Edit Channel → Integrations → Webhooks**, create a webhook, choose the channel, and copy its URL. Keep that URL private.
 2. In Supabase, open **Edge Functions → Secrets** and add:
@@ -65,19 +65,11 @@ This dashboard posts a Discord embed after a shared change is saved. It records 
    npx supabase functions deploy discord-notify
    ```
 
-   Redeploy this function after dashboard notification changes so Discord embeds can include announcement attachments and the current workspace logo.
+   Redeploy this function after dashboard notification changes. Discord Components V2 cards use a container with separators and can include the shared notification thumbnail.
 
    The project ref is the first part of your Supabase project URL, before `.supabase.co`. Leave the function's JWT verification enabled; only a signed-in, approved dashboard member can send a change notice.
-4. Link each teammate's Discord account to their dashboard profile. In Discord, enable **User Settings → Advanced → Developer Mode**, right-click the teammate's profile, and choose **Copy User ID**. In Supabase **Authentication → Users**, find that teammate and copy their dashboard UUID. Run this SQL once per teammate:
-
-   ```sql
-   update public.profiles
-   set discord_user_id = 'PASTE-DISCORD-USER-ID-HERE'
-   where id = 'PASTE-DASHBOARD-UUID-HERE' and approved = true;
-   ```
-
-   Use the numeric Discord User ID, not their display name. Repeat after approving each new teammate. No Discord account needs to be enabled as an OAuth provider.
-5. Push the dashboard changes to GitHub Pages. Create or edit a task, assign a teammate whose Discord ID is linked, and save it. The change should appear in the chosen Discord channel with that assignee mentioned. Edits to other dashboard records are logged too; those changes have no assignee mention.
+4. In the dashboard **Settings**, upload a Discord notification image if you want a custom thumbnail. The image is resized and stored in the public Supabase bucket so Discord can display it. Approved workspace members can see the image.
+5. Push the dashboard changes to GitHub Pages. Create or edit a task and save it. The card should appear in the chosen Discord channel with assignee names shown without pings. Discord incoming webhooks need `with_components=true` to display Components V2; the notification function adds this automatically.
 
 The message uses Discord's explicit allowed-mentions list, so text typed into task titles or descriptions cannot ping `@everyone` or unassigned users. If a teammate has no linked Discord ID, the change is still recorded without a ping to them.
 

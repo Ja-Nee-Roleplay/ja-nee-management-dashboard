@@ -107,8 +107,15 @@ Deno.serve(async (request) => {
       .select("data")
       .eq("id", "main")
       .maybeSingle();
-    const workspaceData = workspaceRow?.data as { logoUrl?: unknown } | undefined;
+    const workspaceData = workspaceRow?.data as { logoUrl?: unknown; discordThumbnailPath?: unknown } | undefined;
     const workspaceLogo = safeHttpsUrl(workspaceData?.logoUrl);
+    const thumbnailPath = typeof workspaceData?.discordThumbnailPath === "string"
+      && /^workspace\/[a-z0-9-]{1,80}\.webp$/i.test(workspaceData.discordThumbnailPath)
+      ? workspaceData.discordThumbnailPath
+      : undefined;
+    const notificationThumbnail = thumbnailPath
+      ? safeHttpsUrl(admin.storage.from("discord-notification-images").getPublicUrl(thumbnailPath).data.publicUrl)
+      : workspaceLogo;
 
     const webhookUrl = Deno.env.get("DISCORD_WEBHOOK_URL");
     if (!webhookUrl) return json({ ok: true, skipped: "Discord webhook is not configured yet." });
@@ -124,12 +131,11 @@ Deno.serve(async (request) => {
       detail?: unknown;
       workspace?: unknown;
       assigneeIds?: unknown;
-      imagePath?: unknown;
     };
     const action = typeof input.action === "string" && Object.hasOwn(actionLabels, input.action) ? input.action : "";
     const entity = typeof input.entity === "string" && Object.hasOwn(entityLabels, input.entity) ? input.entity : "";
     const title = typeof input.title === "string" ? clean(input.title, 180) : "";
-    const detail = typeof input.detail === "string" ? clean(input.detail, 700) : "";
+    const detail = typeof input.detail === "string" ? clean(input.detail, 1800) : "";
     const workspace = typeof input.workspace === "string" ? clean(input.workspace, 80) : "Ja-Nee Management";
     if (!action || !entity || !title) return json({ error: "The change details are incomplete." }, 400);
 
@@ -137,11 +143,10 @@ Deno.serve(async (request) => {
       ? [...new Set(input.assigneeIds.filter((id): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)))].slice(0, 25)
       : [];
     let assigneeNames: string[] = [];
-    let mentionIds: string[] = [];
     if (requestedIds.length) {
       const { data: assignees, error: assigneeError } = await admin
         .from("profiles")
-        .select("display_name,discord_user_id")
+        .select("display_name")
         .eq("approved", true)
         .in("id", requestedIds);
       if (assigneeError) {
@@ -150,52 +155,42 @@ Deno.serve(async (request) => {
       }
       assigneeNames = [...new Set((assignees ?? [])
         .map((assignee) => clean(assignee.display_name ?? "Team member", 80)))];
-      mentionIds = [...new Set((assignees ?? [])
-        .map((assignee) => assignee.discord_user_id)
-        .filter((id): id is string => typeof id === "string" && /^\d{17,20}$/.test(id)))];
     }
 
     const actor = clean(profile.display_name || "A teammate", 80);
-    const moved = entity === "task" && action === "updated" && detail.startsWith("Status:");
+    const moved = entity === "task" && action === "updated" && /(^| · )Status:/.test(detail);
     const cardTitle = moved ? "🔄 Card moved" : `${entityIcons[entity]} ${entityLabels[entity]} ${actionLabels[action]}`;
-    const fields: { name: string; value: string; inline?: boolean }[] = [];
-    if (detail) fields.push({ name: moved ? "↗ STATUS" : "✦ CHANGE SUMMARY", value: detail, inline: false });
-    if (assigneeNames.length) fields.push({ name: "👥 ASSIGNEES", value: assigneeNames.join(", ").slice(0, 900), inline: true });
-    fields.push({ name: "✍️ UPDATED BY", value: actor, inline: true });
 
-    let attachmentUrl: string | undefined;
-    const imagePath = typeof input.imagePath === "string"
-      && /^[0-9a-f-]{36}\/[a-zA-Z0-9._-]{1,110}$/i.test(input.imagePath)
-      ? input.imagePath
-      : undefined;
-    if (entity === "announcement" && imagePath) {
-      const { data: signedImage, error: imageError } = await admin
-        .storage
-        .from("announcement-images")
-        .createSignedUrl(imagePath, 3600);
-      if (!imageError) attachmentUrl = safeHttpsUrl(signedImage?.signedUrl);
-      else console.error("Could not sign announcement image for Discord:", imageError.message);
+    const accentColor = action === "deleted" ? 0xc9675e : moved ? 0x65a9e8 : entity === "announcement" ? 0x8bb76b : 0x729d5c;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const components: Record<string, unknown>[] = [{
+      type: 9,
+      components: [{ type: 10, content: `# JA-NEE • MANAGEMENT\n## ${cardTitle}\n**${title}**` }],
+      ...(notificationThumbnail ? {
+        accessory: {
+          type: 11,
+          media: { url: notificationThumbnail },
+          description: "Ja-Nee workspace notification image",
+        },
+      } : {}),
+    }, { type: 14, divider: true, spacing: 1 }, {
+      type: 10,
+      content: `**${moved ? "↗ STATUS" : "✦ CHANGE SUMMARY"}**\n${detail || "Task details updated."}`,
+    }];
+    if (assigneeNames.length) {
+      components.push({ type: 14, divider: true, spacing: 1 });
+      components.push({ type: 10, content: `**👥 ASSIGNEES**\n${assigneeNames.join(", ").slice(0, 900)}` });
     }
+    components.push({ type: 14, divider: true, spacing: 1 });
+    components.push({ type: 10, content: `**✍️ UPDATED BY** ${actor}\n-# ${workspace} · <t:${timestamp}:F>` });
 
-    const content = mentionIds.map((id) => `<@${id}>`).join(" ");
-    const embed = {
-      author: { name: "JA-NEE • MANAGEMENT", ...(workspaceLogo ? { icon_url: workspaceLogo } : {}) },
-      title: cardTitle,
-      description: `**${title}**`,
-      color: action === "deleted" ? 0xc9675e : moved ? 0x65a9e8 : entity === "announcement" ? 0x8bb76b : 0x729d5c,
-      fields,
-      ...(workspaceLogo ? { thumbnail: { url: workspaceLogo } } : {}),
-      ...(attachmentUrl ? { image: { url: attachmentUrl } } : {}),
-      footer: { text: `JA-NEE ROLEPLAY  ·  ${workspace}` },
-      timestamp: new Date().toISOString(),
-    };
-    const response = await fetch(`${webhookUrl}${webhookUrl.includes("?") ? "&" : "?"}wait=true`, {
+    const response = await fetch(`${webhookUrl}${webhookUrl.includes("?") ? "&" : "?"}wait=true&with_components=true`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...(content ? { content } : {}),
-        embeds: [embed],
-        allowed_mentions: { parse: [], users: mentionIds },
+        flags: 1 << 15,
+        components: [{ type: 17, accent_color: accentColor, components }],
+        allowed_mentions: { parse: [] },
       }),
     });
     if (!response.ok) {
