@@ -356,3 +356,31 @@ button:hover>svg,.button:hover>svg{transform:scale(1.08)}
 .light .priority.medium{border-color:#edd0a4;background:#fff1db;color:#9a5c11}
 .light .priority.high{border-color:#efc1c1;background:#fde8e8;color:#a83434}
 .light .priority.urgent{border-color:#edc0d9;background:#fce7f2;color:#9c336a}
+
+/* Keep the board's horizontal control visible while its cards scroll vertically. */
+.board-scroll-dock{position:sticky;top:70px;z-index:15;margin:0 0 11px;padding:7px 11px 3px;border:1px solid #344735;border-radius:10px;background:color-mix(in srgb,var(--surface) 88%,transparent);box-shadow:0 7px 20px #0002;backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15)}
+.board-scroll-dock.is-hidden{visibility:hidden;height:0;margin:0;padding:0;border:0;overflow:hidden}
+.board-scroll-dock.is-hidden .board-scroll-caption{display:none}
+.board-scroll-dock.is-hidden .board-scroll-top{height:0}
+.board-scroll-caption{display:block;margin:0 0 3px;color:#91a68f;font-size:9px;font-weight:700;letter-spacing:.09em}
+.board-scroll-top{width:100%;height:16px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:#78916f #263329;touch-action:pan-x}
+.board-scroll-top:focus-visible{outline:2px solid #8ab763;outline-offset:2px;border-radius:5px}
+.board-scroll-top::-webkit-scrollbar{height:10px}
+.board-scroll-top::-webkit-scrollbar-track{border-radius:999px;background:#263329}
+.board-scroll-top::-webkit-scrollbar-thumb{border:2px solid #263329;border-radius:999px;background:linear-gradient(90deg,#65845d,#91ad7b)}
+.board-scroll-spacer{height:1px;pointer-events:none}
+.board{scroll-behavior:auto;overscroll-behavior-x:contain}
+.add-column-task{display:flex;align-items:center;gap:8px;width:100%;min-height:38px;margin:5px 0 7px;padding:0 10px;border:1px dashed #415444;border-radius:9px;background:linear-gradient(135deg,#202d22,#1a251c);color:#c3d4bd;text-align:left;font-size:12px;font-weight:600;transition:border-color .18s ease,background-color .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease}
+.add-column-task svg{width:15px;height:15px;color:#a9cf90}
+.add-column-task:hover{transform:translateY(-1px);border-style:solid;border-color:#729266;background:linear-gradient(135deg,#2a3a2b,#202d22);color:#edf5e9;box-shadow:0 5px 13px #0002}
+.add-column-task:active{transform:scale(.99)}
+.light .board-scroll-dock{border-color:#d7e0d5;background:#f7faf5ed;box-shadow:0 7px 20px #20302018}
+.light .board-scroll-caption{color:#5e7657}
+.light .board-scroll-top{scrollbar-color:#8aa17f #e5ebe3}
+.light .board-scroll-top::-webkit-scrollbar-track{background:#e5ebe3}
+.light .board-scroll-top::-webkit-scrollbar-thumb{border-color:#e5ebe3;background:linear-gradient(90deg,#8ca780,#a9c39a)}
+.light .add-column-task{border-color:#c8d5c4;background:linear-gradient(135deg,#f2f8ef,#eaf3e6);color:#345333}
+.light .add-column-task svg{color:#5b8b4f}
+.light .add-column-task:hover{border-color:#85a87a;background:linear-gradient(135deg,#eaf5e5,#e2efdc);color:#244323}
+@media(max-width:760px){.board-scroll-dock{top:68px}}
+@media(max-width:610px){.board-scroll-dock{top:64px;margin-inline:-1px;padding-inline:8px}.board-scroll-caption{font-size:8px}.board-scroll-top{height:18px}}
