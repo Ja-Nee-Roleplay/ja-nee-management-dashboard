@@ -260,3 +260,65 @@ button:hover>svg,.button:hover>svg{transform:scale(1.08)}
 .roadmap-card{padding:20px;border-radius:15px;background:linear-gradient(145deg,#1b231d,#171e19)}.roadmap-card header,.roadmap-card footer{font-size:11px}.roadmap-card h3{font-size:16px}.roadmap-card p{font-size:12px}.roadmap-card input[type=range]{height:24px}.member-card{padding:17px;border-radius:14px}.member-card h3{font-size:14px}.member-card p,.member-card footer{font-size:11px}.resource-card{min-height:75px;padding:13px;border-radius:13px}.resource-card b{font-size:12px}.resource-card p,.resource-card small{font-size:10px}.settings-card{padding:18px;border-radius:14px}.settings-card h3{font-size:14px}.settings-card p,.settings-card label{font-size:12px}.modal{border-radius:18px;box-shadow:0 34px 100px #000a;backdrop-filter:blur(18px);animation:popover-arrive .2s ease-out both}.backdrop{background:#080b08bd;backdrop-filter:blur(8px) saturate(.82)}
 .searchbox{height:40px;border-radius:10px}.searchbox input{font-size:11px}.searchbox kbd{font-size:9px}.search-results{top:47px;border-radius:13px;padding:7px}.search-results button span,.search-results p{font-size:11px}.search-results small{font-size:10px}.widget-menu{top:46px;width:220px;padding:9px;border-radius:12px}.widget-menu label{padding:9px;font-size:11px}.online-count{font-size:10px}.top-user{font-size:11px}.bell{width:38px;height:38px}.toast{max-width:calc(100vw - 28px);padding:11px 15px;border-radius:11px;font-size:12px;box-shadow:0 12px 32px #0005}
 .sidebar{background:linear-gradient(180deg,#171d18,#131814 72%);border-right-color:#29342b}.nav-item.active{background:linear-gradient(100deg,#284825,#1c2d20);box-shadow:inset 3px 0 var(--accent),inset 0 1px #ffffff09}.nav-item:hover{transform:translateX(2px)}.button,.icon-btn,.nav-item,.top-user,.quick>button{transition:background-color .2s ease,border-color .2s ease,color .2s ease,box-shadow .2s ease,transform .22s cubic-bezier(.2,.75,.25,1),filter .2s ease}
+
+/* Keep activity avatars fixed-size; only the text column should consume remaining width. */
+.event>.avatar{width:30px;height:30px;min-width:30px;flex:0 0 30px;overflow:hidden}
+.event>span:nth-child(2){flex:1 1 auto;min-width:0}
+.event>.avatar>img{inset:0;width:100%;height:100%;max-width:100%;object-fit:cover}
+
+/* Discord-inspired charcoal surfaces with Ja-Nee green reserved for status and actions. */
+.app{--discord-main:#313338;--discord-sidebar:#1e1f22;--discord-surface:#2b2d31;--discord-raised:#383a40;--discord-line:#3f4147;--line:var(--discord-line);--surface:var(--discord-surface);background:var(--discord-main);color:#f2f3f5}
+.main{background:var(--discord-main)}
+.sidebar{background:var(--discord-sidebar);border-right:1px solid #17181a}
+.brand{margin-bottom:3px}
+.workspace{border-color:#292a2e;background:#232428}
+.nav-caption,.online-caption{color:#949ba4}
+.nav-item{color:#b5bac1;border-radius:8px}
+.nav-item:hover{background:#35373c;color:#f2f3f5}
+.nav-item.active{background:#3c3e44;box-shadow:inset 3px 0 var(--accent);color:#f2f3f5}
+.nav-item.active svg{color:#afd391}
+.nav-item em{background:#232428;color:#c7cacf}
+.private-card{border-color:#34373d;background:#26282d;color:#a9cb8d}
+.private-card b{color:#e2e5e9}
+.topbar{background:#313338f2;border-color:#292a2e}
+.searchbox{border-color:#202125;background:#1e1f22;color:#b5bac1}
+.searchbox:focus-within{border-color:#647b58;box-shadow:0 0 0 2px #6b8a5930}
+.bell{border-color:#45474e;background:#2b2d31}
+.top-user{color:#e3e5e8}
+.content{max-width:1600px}
+.stat,.overview-grid .panel,.quick>button,.roadmap-card,.settings-card,.member-card,.resource-card,.task-card{border-color:#3a3c42;background:linear-gradient(145deg,#2d2f34,#292b30);box-shadow:inset 0 1px #ffffff08}
+.stat>span{background:#3c493b;color:#b5d19f}
+.panel-title{border-color:#3f414755}
+.deadline{border-color:#3f4147;color:#e3e5e8}
+.date-block{border-color:#4a4c52;background:#24262a}
+.event{border-color:#3f4147;color:#c5c8ce}
+.event b{color:#f2f3f5}
+.event small{color:#949ba4}
+.roadmap-mini>div b,.member-line b{color:#f2f3f5}
+.progress{background:#44464d}
+.quick{border-color:#3a3c42;background:#2b2d31}
+.quick>button{color:#dbdee1}
+.quick>button:hover,.task-card:hover{border-color:#647859;background:#34373c}
+.column{border-color:#3a3c42;background:#27292e}
+.column-title small{background:#383a40;color:#c1c4ca}
+.add-inline,.add-column{border-color:#4a4d53;color:#b5bac1}
+.add-inline:hover,.add-column:hover{border-color:#6a865c;background:#34373c;color:#e8f0e3}
+.announcement,.pinned-announcements{border-color:#3c4147;background:linear-gradient(145deg,#2b2d31,#27292e)}
+.pinned-announcement{border-color:#44474d;background:#232428}
+.announcement.pinned{border-color:#6b865a}
+.button.outline{border-color:#4b4e55;color:#e3e5e8}
+.button.outline:hover{border-color:#6b865a;background:#383a40}
+.icon-btn{color:#b5bac1}
+.icon-btn:hover{background:#3c3e44;color:#fff}
+.search-results,.widget-menu,.column-menu{border-color:#45474e;background:#232428f2}
+.toast{border-color:#586d4e;background:#303c2e;color:#e6f0df}
+.light.app{--discord-main:#f2f3f5;--discord-sidebar:#fff;--discord-surface:#fff;--discord-raised:#e8e9ec;--discord-line:#d9dce1;background:var(--discord-main);color:#2e3338}
+.light .main{background:#f2f3f5}
+.light .sidebar{background:#fff;border-color:#e5e7eb}
+.light .topbar{background:#f2f3f5f2;border-color:#e1e3e7}
+.light .workspace,.light .searchbox{border-color:#e1e3e7;background:#f2f3f5}
+.light .nav-item{color:#4e535a}
+.light .nav-item:hover,.light .nav-item.active{background:#e8e9ec;color:#2e3338}
+.light .stat,.light .overview-grid .panel,.light .quick>button,.light .roadmap-card,.light .settings-card,.light .member-card,.light .resource-card,.light .task-card,.light .announcement,.light .pinned-announcements{border-color:#d9dce1;background:#fff;color:#2e3338}
+.light .event,.light .event b,.light .member-line b{color:#3f434a}
+@media(max-width:610px){.app{--discord-main:#313338}.event>.avatar{width:28px;height:28px;min-width:28px;flex-basis:28px}.event .avatar.small{width:28px;height:28px}}
