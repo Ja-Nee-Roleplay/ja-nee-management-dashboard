@@ -187,68 +187,81 @@ export default function App(){
 
 function Dashboard({user,profile,initialData,workspaceExists,onSignOut}:{user:User;profile:WorkspaceProfile;initialData:Store;workspaceExists:boolean;onSignOut:()=>Promise<void>}){
  const pageStorageKey=`ja-nee-dashboard:${user.id}:page`;const taskStorageKey=`ja-nee-dashboard:${user.id}:task`;
- const [data,setData]=useState<Store>(initialData);const [page,setPage]=useState<Page>(()=>{try{const saved=sessionStorage.getItem(pageStorageKey);return nav.some(item=>item.name===saved)?saved as Page:"Overview"}catch{return"Overview"}});const [query,setQuery]=useState("");const [searchOpen,setSearchOpen]=useState(false);const [announcementComposer,setAnnouncementComposer]=useState(false);const [announcementImageUrls,setAnnouncementImageUrls]=useState<Record<string,string>>({});const [taskId,setTaskId]=useState<string|null>(()=>{try{return sessionStorage.getItem(taskStorageKey)}catch{return null}});const [creating,setCreating]=useState(false);const [filter,setFilter]=useState("All priorities");const [assigneeFilter,setAssigneeFilter]=useState("Everyone");const [sort,setSort]=useState("Manual");const [drag,setDrag]=useState<string|null>(null);const [toast,setToast]=useState("");const [menu,setMenu]=useState(false);const [collapsed,setCollapsed]=useState(false);const [mobile,setMobile]=useState(false);const [syncStatus,setSyncStatus]=useState<"saved"|"saving"|"error">("saved");
- const clientId=useRef(uid());const savedSnapshot=useRef(workspaceExists?JSON.stringify(initialData):"");const remoteSnapshot=useRef<string|null>(null);const membersRef=useRef(data.members);const currentData=useRef(data);const savedData=useRef<Store|null>(workspaceExists?initialData:null);const [onlineProfileIds,setOnlineProfileIds]=useState<string[]>([]);const notificationWarningShown=useRef(false);
+ const [data,setData]=useState<Store>(initialData);const [page,setPage]=useState<Page>(()=>{try{const saved=sessionStorage.getItem(pageStorageKey);return nav.some(item=>item.name===saved)?saved as Page:"Overview"}catch{return"Overview"}});const [query,setQuery]=useState("");const [searchOpen,setSearchOpen]=useState(false);const [announcementComposer,setAnnouncementComposer]=useState(false);const [announcementImageUrls,setAnnouncementImageUrls]=useState<Record<string,string>>({});const [taskId,setTaskId]=useState<string|null>(()=>{try{return sessionStorage.getItem(taskStorageKey)}catch{return null}});const [creating,setCreating]=useState(false);const [filter,setFilter]=useState("All priorities");const [assigneeFilter,setAssigneeFilter]=useState("Everyone");const [sort,setSort]=useState("Manual");const [drag,setDrag]=useState<string|null>(null);const [toast,setToast]=useState("");const [menu,setMenu]=useState(false);const [collapsed,setCollapsed]=useState(false);const [mobile,setMobile]=useState(false);const [syncStatus,setSyncStatus]=useState<"saved"|"saving"|"error">("saved");const [syncRetry,setSyncRetry]=useState(0);
+  const clientId=useRef(uid());const savedSnapshot=useRef(workspaceExists?JSON.stringify(initialData):"");const remoteSnapshot=useRef<string|null>(null);const membersRef=useRef(data.members);const currentData=useRef(data);const savedData=useRef<Store|null>(workspaceExists?initialData:null);const saveQueue=useRef<Promise<void>>(Promise.resolve());const [onlineProfileIds,setOnlineProfileIds]=useState<string[]>([]);const notificationWarningShown=useRef(false);const syncErrorToastShown=useRef(false);
  useEffect(()=>{try{sessionStorage.setItem(pageStorageKey,page)}catch{}},[page,pageStorageKey]);
  useEffect(()=>{try{if(taskId&&data.tasks.some(task=>task.id===taskId))sessionStorage.setItem(taskStorageKey,taskId);else sessionStorage.removeItem(taskStorageKey)}catch{}},[data.tasks,taskId,taskStorageKey]);
  useEffect(()=>{membersRef.current=data.members;currentData.current=data},[data]);
  useEffect(()=>{const dismissSearch=(event:PointerEvent)=>{if(event.target instanceof Element&&!event.target.closest(".searchbox"))setSearchOpen(false)};document.addEventListener("pointerdown",dismissSearch);return()=>document.removeEventListener("pointerdown",dismissSearch)},[]);
  useEffect(()=>{let active=true;const paths=[...new Set(data.announcements.flatMap(item=>item.imagePaths??[]))];if(!supabase||!paths.length)return;const refresh=()=>{void Promise.all(paths.map(async path=>{const {data:result}=await supabase!.storage.from("announcement-images").createSignedUrl(path,3600);return result?.signedUrl?([path,result.signedUrl] as const):null})).then(results=>{if(active)setAnnouncementImageUrls(Object.fromEntries(results.filter((item):item is readonly [string,string]=>!!item)))});};refresh();const timer=window.setInterval(refresh,45*60*1000);return()=>{active=false;window.clearInterval(timer)}},[data.announcements]);
- useEffect(()=>{
-  const snapshot=JSON.stringify(data);
-  if(snapshot===savedSnapshot.current)return;
-  if(snapshot===remoteSnapshot.current){savedSnapshot.current=snapshot;remoteSnapshot.current=null;return}
-  setSyncStatus("saving");
-  const timer=setTimeout(()=>{void (async()=>{
-   const {error}=await supabase!.from("workspace_state").upsert({id:"main",data,updated_by:user.id,updated_by_client:clientId.current},{onConflict:"id"});
-   if(error){setSyncStatus("error");setToast("Cloud sync failed. Check your database permissions.");return}
-   const previous=savedData.current;
-   savedData.current=data;
-   savedSnapshot.current=snapshot;setSyncStatus("saved");
-   if(previous){
-    const changes=changesBetween(previous,data);
-    void Promise.all(changes.map(async change=>{
-     const {error:notifyError}=await supabase!.functions.invoke("discord-notify",{body:{...change,workspace:data.workspace}});
-     const status=(notifyError as {context?:{status?:number}}|null)?.context?.status;
-     if(notifyError&&status!==404&&!notificationWarningShown.current){notificationWarningShown.current=true;setToast("Saved, but Discord could not receive a change notice. Check the webhook setup.")}
-    }));
-   }
-  })()},450);
-  return()=>clearTimeout(timer);
- },[data,user.id]);
+  useEffect(()=>{
+   const snapshot=JSON.stringify(data);
+   if(snapshot===savedSnapshot.current)return;
+   if(snapshot===remoteSnapshot.current){savedSnapshot.current=snapshot;remoteSnapshot.current=null;return}
+   setSyncStatus("saving");
+   const timer=window.setTimeout(()=>{
+    const saveLatest=async()=>{
+     const latest=currentData.current;const latestSnapshot=JSON.stringify(latest);
+     if(latestSnapshot===savedSnapshot.current){setSyncStatus("saved");return}
+     const previous=savedData.current;
+     try{
+      const {error}=await supabase!.from("workspace_state").upsert({id:"main",data:latest,updated_by:user.id,updated_by_client:clientId.current},{onConflict:"id"});
+      if(error){if(JSON.stringify(currentData.current)===latestSnapshot){setSyncStatus("error");if(!syncErrorToastShown.current){syncErrorToastShown.current=true;setToast("Changes could not sync. Check your connection and database access.")}}else setSyncStatus("saving");return}
+      savedData.current=latest;savedSnapshot.current=latestSnapshot;syncErrorToastShown.current=false;
+      const isCurrent=JSON.stringify(currentData.current)===latestSnapshot;setSyncStatus(isCurrent?"saved":"saving");
+      if(previous){
+       const changes=changesBetween(previous,latest);
+       void Promise.all(changes.map(async change=>{
+        const {error:notifyError}=await supabase!.functions.invoke("discord-notify",{body:{...change,workspace:latest.workspace}});
+        const status=(notifyError as {context?:{status?:number}}|null)?.context?.status;
+        if(notifyError&&status!==404&&!notificationWarningShown.current){notificationWarningShown.current=true;setToast("Saved, but Discord could not receive a change notice. Check the webhook setup.")}
+       }));
+      }
+     }catch{
+      if(JSON.stringify(currentData.current)===latestSnapshot){setSyncStatus("error");if(!syncErrorToastShown.current){syncErrorToastShown.current=true;setToast("Changes could not sync. Check your connection and database access.")}}else setSyncStatus("saving");
+     }
+    };
+    const queued=saveQueue.current.catch(()=>{}).then(saveLatest);saveQueue.current=queued;
+   },450);
+   return()=>window.clearTimeout(timer);
+  },[data,user.id,syncRetry]);
  useEffect(()=>{
   let alive=true;let refreshing=false;
-  const applyRemoteRow=(row:WorkspaceRow)=>{
-   if(row.updated_by_client===clientId.current)return;
-   const incoming=normalizeStore(row.data,profile);incoming.members=membersRef.current;
-   const remoteState=JSON.stringify(incoming);if(remoteState===savedSnapshot.current){setSyncStatus(current=>current==="error"?(JSON.stringify(currentData.current)===savedSnapshot.current?"saved":"saving"):current);return}
+   const applyRemoteRow=(row:WorkspaceRow)=>{
+    const incoming=normalizeStore(row.data,profile);incoming.members=membersRef.current;
+    const remoteState=JSON.stringify(incoming);
+    if(row.updated_by_client===clientId.current){
+     if(remoteState!==savedSnapshot.current){savedSnapshot.current=remoteState;savedData.current=incoming}
+     setSyncStatus(JSON.stringify(currentData.current)===remoteState?"saved":"saving");return
+    }
+    if(remoteState===savedSnapshot.current){setSyncStatus(current=>current==="error"?(JSON.stringify(currentData.current)===savedSnapshot.current?"saved":"saving"):current);return}
    const local=currentData.current;const localState=JSON.stringify(local);const hasLocalChanges=localState!==savedSnapshot.current;const baseline=savedData.current;
    const next=hasLocalChanges&&baseline?mergeLocalWorkspaceChanges(baseline,local,incoming):incoming;const nextState=JSON.stringify(next);
    remoteSnapshot.current=remoteState;savedSnapshot.current=remoteState;savedData.current=incoming;
    if(nextState===remoteState)remoteSnapshot.current=nextState;
    currentData.current=next;setData(previous=>JSON.stringify(previous)===nextState?previous:next);setSyncStatus(nextState===remoteState?"saved":"saving");
   };
-  const refresh=async()=>{
+   const refresh=async(retryDirty=false)=>{
    if(!alive||refreshing||document.visibilityState!=="visible")return;
    refreshing=true;
    try{
     const {data:row,error}=await supabase!.from("workspace_state").select("data,updated_by_client").eq("id","main").maybeSingle();
     if(!alive)return;
     if(error){setSyncStatus("error");return}
-    if(row)applyRemoteRow(row as WorkspaceRow);else setSyncStatus(current=>current==="error"?"saved":current);
+     if(row)applyRemoteRow(row as WorkspaceRow);else setSyncStatus(current=>current==="error"?"saved":current);
+     if(retryDirty&&navigator.onLine&&JSON.stringify(currentData.current)!==savedSnapshot.current)setSyncRetry(value=>value+1);
    }catch{
     if(alive)setSyncStatus("error");
    }finally{refreshing=false}
   };
-  const onResume=()=>{if(document.visibilityState==="visible")void refresh()};
+   const onResume=()=>{if(document.visibilityState==="visible")void refresh(true)};
   const channel=supabase!.channel("workspace-state-main").on("postgres_changes",{event:"*",schema:"public",table:"workspace_state",filter:"id=eq.main"},payload=>{
    if(payload.eventType!=="DELETE")applyRemoteRow(payload.new as WorkspaceRow);
-  }).subscribe(status=>{
-   if(status==="SUBSCRIBED")void refresh();
-   else if(status==="CHANNEL_ERROR"||status==="TIMED_OUT")setSyncStatus("error");
-  });
-  window.addEventListener("online",onResume);window.addEventListener("focus",onResume);document.addEventListener("visibilitychange",onResume);
-  const timer=window.setInterval(onResume,20000);
+   }).subscribe(status=>{
+    if(status==="SUBSCRIBED")void refresh(true);
+   });
+   window.addEventListener("online",onResume);window.addEventListener("focus",onResume);document.addEventListener("visibilitychange",onResume);
+   const timer=window.setInterval(()=>{if(document.visibilityState==="visible")void refresh(true)},20000);
   return()=>{alive=false;window.clearInterval(timer);window.removeEventListener("online",onResume);window.removeEventListener("focus",onResume);document.removeEventListener("visibilitychange",onResume);void supabase!.removeChannel(channel)};
  },[profile]);
  useEffect(()=>{
@@ -275,7 +288,7 @@ function Dashboard({user,profile,initialData,workspaceExists,onSignOut}:{user:Us
  const self=displayMembers.find(member=>member.id===profile.id)??asMember(profile,0);
  const actor=self.name;
  const log=(text:string)=>setData(d=>({...d,events:[{id:uid(),text,actor,date:new Date().toISOString()},...d.events].slice(0,100)}));
- const addTaskComment=(id:string,text:string)=>{const now=new Date().toISOString();setData(current=>{const task=current.tasks.find(item=>item.id===id);if(!task)return current;const comment={id:uid(),text,author:actor,createdAt:now};return{...current,tasks:current.tasks.map(item=>item.id===id?{...item,comments:[...(item.comments??[]),comment]}:item),events:[{id:uid(),text:"commented on “"+task.title+"”",actor,date:now},...current.events].slice(0,100)}});setToast("Comment added")};
+ const addTaskComment=(id:string,text:string)=>{const now=new Date().toISOString();const commentId=uid();const eventId=uid();setData(current=>{const task=current.tasks.find(item=>item.id===id);if(!task)return current;const comment={id:commentId,text,author:actor,createdAt:now};return{...current,tasks:current.tasks.map(item=>item.id===id?{...item,comments:[...(item.comments??[]),comment]}:item),events:[{id:eventId,text:"commented on “"+task.title+"”",actor,date:now},...current.events].slice(0,100)}});setToast("Comment added · syncing")};
   const done=data.columns.filter(isCompletedColumn).map(c=>c.id);const active=data.columns.filter(c=>/progress|review|testing/i.test(c.title)).map(c=>c.id);
  const stats={all:data.tasks.length,completed:data.tasks.filter(t=>done.includes(t.columnId)).length,active:data.tasks.filter(t=>active.includes(t.columnId)).length,late:data.tasks.filter(t=>late(t.dueDate)&&!done.includes(t.columnId)).length};
  const selected=data.tasks.find(t=>t.id===taskId)??null;
