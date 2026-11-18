@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type FormEvent } from "react";
 import type { User } from "@supabase/supabase-js";
-import { Activity, ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, CircleAlert, ExternalLink, Filter, GitBranch, LayoutDashboard, Link2, ListTodo, LogOut, Menu, MessageCircle, Milestone, MoreHorizontal, Plus, Search, Settings as SettingsIcon, ShieldCheck, Trash2, Users, X, Zap } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, Bell, CalendarDays, Check, CheckCircle2, ChevronDown, CircleAlert, ExternalLink, Filter, GitBranch, LayoutDashboard, Link2, ListTodo, LogOut, Menu, MessageCircle, Milestone, MoreHorizontal, Plus, Search, Settings as SettingsIcon, ShieldCheck, Trash2, Users, X, Zap } from "lucide-react";
 import { getAuthRedirectUrl, isSupabaseConfigured, supabase } from "./lib/supabase";
 
 const TODAY = new Date();
 type Priority = "Low" | "Medium" | "High" | "Urgent";
 type Page = "Overview" | "Task board" | "Roadmaps" | "Calendar" | "Announcements" | "Activity log" | "Members" | "Resources" | "Settings";
-type Member = { id:string; name:string; handle:string; role:string; color:string; status:string };
+type Member = { id:string; name:string; handle:string; role:string; color:string; status:string; avatarUrl?:string };
 type Column = { id:string; title:string; color:string };
 type Task = { id:string; title:string; description:string; columnId:string; priority:Priority; tags:string[]; assignees:string[]; dueDate:string; checklist:{id:string;text:string;done:boolean}[]; comments:{id:string;text:string;author:string}[]; createdAt:string; updatedAt:string; completedAt?:string };
 type Roadmap = { id:string; title:string; category:string; progress:number; target:string; priority:Priority };
@@ -20,7 +20,7 @@ type AuthProvider = "github";
 const uid=()=>Math.random().toString(36).slice(2,10);
 const seed=(profile:WorkspaceProfile):Store=>{
  const profileName=profile.display_name||profile.username||"Member";
- const members:Member[]=[{id:profile.id,name:profileName,handle:profile.username?"@"+profile.username:"@"+profileName.replace(/\s+/g,""),role:profile.role,color:"#587d4a",status:"Online"}];
+ const members:Member[]=[{id:profile.id,name:profileName,handle:profile.username?"@"+profile.username:"@"+profileName.replace(/\s+/g,""),role:profile.role,color:"#587d4a",status:"Online",avatarUrl:profile.avatar_url??undefined}];
  const columns:Column[]=[{id:"backlog",title:"Backlog",color:"#7d8792"},{id:"todo",title:"To do",color:"#88954a"},{id:"doing",title:"In progress",color:"#75a252"},{id:"review",title:"Under review",color:"#a78753"},{id:"done",title:"Completed",color:"#4e956b"}];
  return {workspace:"Ja-Nee Management",logoUrl:"",accent:"#165209",theme:"dark",completedTaskRetentionDays:0,columns,tasks:[],members,
   roadmaps:[],announcements:[],resources:[],tags:[],events:[],widgets:{deadlines:true,activity:true,roadmap:true,members:true}};
@@ -99,7 +99,7 @@ const memberColors=["#587d4a","#6c829e","#a87856","#846b9d","#567d80"];
 const roleName=(role:string)=>({owner:"Owner",administrator:"Administrator",management:"Management",developer:"Developer",viewer:"Viewer"}[role]??"Member");
 function asMember(profile:WorkspaceProfile,index:number):Member{
  const name=profile.display_name||profile.username||"Member";
- return{id:profile.id,name,handle:profile.username?"@"+profile.username:"@"+name.replace(/\s+/g,""),role:roleName(profile.role),color:memberColors[index%memberColors.length],status:"Offline"};
+ return{id:profile.id,name,handle:profile.username?"@"+profile.username:"@"+name.replace(/\s+/g,""),role:roleName(profile.role),color:memberColors[index%memberColors.length],status:"Offline",avatarUrl:profile.avatar_url??undefined};
 }
 function BrandLogo({src}:{src?:string}){return <span className={"logo "+(src?"logo-image":"")}>{src?<img src={src} alt="Workspace logo"/>:<>JN<i/></>}</span>}
 function Gate({title,children}:{title:string;children:React.ReactNode}){return <main className="auth-page"><section className="auth-card"><aside className="auth-side"><div className="auth-brand"><BrandLogo/><span><b>ja-nee</b><small>MANAGEMENT</small></span></div><div className="auth-art"><span className="auth-orbit orbit-one"/><span className="auth-orbit orbit-two"/><span className="auth-orbit orbit-three"/><div className="auth-art-mark"><LayoutDashboard size={34}/></div></div><div className="auth-side-copy"><small>ONE SHARED WORKSPACE</small><h2>Good work,<br/>in one place.</h2><p>Plan projects, keep your team aligned, and see progress as it happens.</p></div><span className="auth-side-footer">JA-NEE TEAM · PRIVATE WORKSPACE</span></aside><div className="auth-content"><div className="auth-mobile-brand"><BrandLogo/><b>ja-nee</b></div><small className="auth-eyebrow">JA-NEE TEAM WORKSPACE</small><h1>{title}</h1>{children}</div></section></main>}
@@ -272,7 +272,7 @@ function Dashboard({user,profile,initialData,workspaceExists,onSignOut}:{user:Us
  const addResource=()=>{const title=prompt("Resource name");if(!title?.trim())return;const url=prompt("Website URL starting with https://");if(!url||!/^https?:\/\//i.test(url)){setToast("Enter a valid http or https link");return}const r:Resource={id:uid(),title:title.trim(),url,description:prompt("Short description")??"",category:"Operations"};setData(d=>({...d,resources:[...d.resources,r]}));log("added resource “"+r.title+"”")};
  const choose=(r:{id:string;page:Page;task:boolean})=>{setPage(r.page);if(r.task)setTaskId(r.id);setQuery("")};
  return <div className={"app "+data.theme} style={{"--accent":data.accent} as CSSProperties}>
-  <aside className={"sidebar "+(collapsed?"collapsed ":"")+(mobile?"mobile-open":"")}><div className="brand"><BrandLogo src={data.logoUrl}/>{!collapsed&&<span className="brand-words"><b>ja-nee</b><small>MANAGEMENT</small></span>}<button className="icon-btn collapse" onClick={()=>setCollapsed(!collapsed)}><ArrowRight size={15}/></button><button className="icon-btn mobile-close" onClick={()=>setMobile(false)}><X size={16}/></button></div>
+  <aside className={"sidebar "+(collapsed?"collapsed ":"")+(mobile?"mobile-open":"")}><div className="brand"><BrandLogo src={data.logoUrl}/>{!collapsed&&<span className="brand-words"><b>ja-nee</b><small>MANAGEMENT</small></span>}<button className="icon-btn collapse" aria-label={collapsed?"Expand sidebar":"Collapse sidebar"} aria-expanded={!collapsed} title={collapsed?"Expand sidebar":"Collapse sidebar"} onClick={()=>setCollapsed(!collapsed)}>{collapsed?<ArrowRight size={15}/>:<ArrowLeft size={15}/>}</button><button className="icon-btn mobile-close" onClick={()=>setMobile(false)}><X size={16}/></button></div>
    {!collapsed&&<div className="workspace"><b className="workspace-mark">J</b><span><strong>{data.workspace}</strong><small>Management workspace</small></span><ChevronDown size={13}/></div>}<div className="nav-caption">{!collapsed&&"WORKSPACE"}</div>
    <nav>{nav.map(({name,icon:Icon})=><button key={name} title={collapsed?name:""} className={"nav-item "+(page===name?"active":"")} onClick={()=>{setPage(name);setMobile(false)}}><Icon size={16}/><span>{!collapsed&&name}</span>{name==="Task board"&&!collapsed&&<em>{stats.all-stats.completed}</em>}</button>)}</nav>
    <div className="side-bottom">{!collapsed&&<div className="online-caption">TEAM ONLINE <span>{displayMembers.filter(m=>m.status==="Online").length}</span></div>}<div className="online-avatars">{displayMembers.filter(m=>m.status==="Online").slice(0,4).map(m=><Avatar key={m.id} member={m} small/>)}</div>{!collapsed&&<div className="private-card"><ShieldCheck size={14}/><span><b>Shared workspace</b><small>{syncStatus==="saving"?"Syncing to Supabase…":syncStatus==="error"?"Sync needs attention":"Supabase synced"}</small></span></div>}<button className="profile" onClick={()=>setPage("Settings")}><Avatar member={self}/><span><b>{self.name}</b><small>{self.role}</small></span><MoreHorizontal size={15}/></button></div>
@@ -294,7 +294,7 @@ function Dashboard({user,profile,initialData,workspaceExists,onSignOut}:{user:Us
   {toast&&<div className="toast"><Check size={14}/>{toast}</div>}
  </div>
 }
-function Avatar({member,small=false}:{member:Member;small?:boolean}){return <span className={"avatar "+(small?"small":"")} style={{background:member.color}} title={member.name}>{initials(member.name)}</span>}
+function Avatar({member,small=false}:{member:Member;small?:boolean}){return <span className={"avatar "+(small?"small":"")} style={{background:member.color}} title={member.name}><span>{initials(member.name)}</span>{member.avatarUrl&&<img src={member.avatarUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={event=>{event.currentTarget.style.display="none"}}/>}</span>}
 function Heading({eyebrow,title,description,action}:{eyebrow:string;title:string;description:string;action?:React.ReactNode}){return <div className="heading"><div><small>{eyebrow}</small><h2>{title}</h2><p>{description}</p></div>{action}</div>}
 function Badge({value}:{value:Priority}){return <span className={"priority "+value.toLowerCase()}>{value}</span>}
 function Progress({value}:{value:number}){return <div className="progress"><i style={{width:Math.max(0,Math.min(100,value))+"%"}}/></div>}
