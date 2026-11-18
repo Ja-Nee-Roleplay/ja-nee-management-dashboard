@@ -346,3 +346,13 @@ button:hover>svg,.button:hover>svg{transform:scale(1.08)}
 .app:not(.light) .widget-menu,
 .app:not(.light) .search-results,
 .app:not(.light) .column-menu{border-color:#344735;background:#19231bf2}
+.priority{display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:4px 9px;border:1px solid transparent;border-radius:7px;font-size:10px;font-weight:700;line-height:1;letter-spacing:.01em;white-space:nowrap}
+.priority.low{border-color:#3b7650;background:#244a31;color:#b6f0a5}
+.priority.medium{border-color:#815d34;background:#4b3824;color:#ffd08d}
+.priority.high{border-color:#81464a;background:#4a282c;color:#ff9998}
+.priority.urgent{border-color:#834a6d;background:#4b293e;color:#ffacd5}
+.task-card .priority{min-height:24px;padding:5px 10px;font-size:11px}
+.light .priority.low{border-color:#b8dfb5;background:#e5f5e4;color:#286b36}
+.light .priority.medium{border-color:#edd0a4;background:#fff1db;color:#9a5c11}
+.light .priority.high{border-color:#efc1c1;background:#fde8e8;color:#a83434}
+.light .priority.urgent{border-color:#edc0d9;background:#fce7f2;color:#9c336a}
