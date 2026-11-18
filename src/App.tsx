@@ -8,13 +8,13 @@ type Priority = "Low" | "Medium" | "High" | "Urgent";
 type Page = "Overview" | "Task board" | "Roadmaps" | "Calendar" | "Announcements" | "Activity log" | "Members" | "Resources" | "Settings";
 type Member = { id:string; name:string; handle:string; role:string; color:string; status:string };
 type Column = { id:string; title:string; color:string };
-type Task = { id:string; title:string; description:string; columnId:string; priority:Priority; tags:string[]; assignees:string[]; dueDate:string; checklist:{id:string;text:string;done:boolean}[]; comments:{id:string;text:string;author:string}[]; createdAt:string; updatedAt:string };
+type Task = { id:string; title:string; description:string; columnId:string; priority:Priority; tags:string[]; assignees:string[]; dueDate:string; checklist:{id:string;text:string;done:boolean}[]; comments:{id:string;text:string;author:string}[]; createdAt:string; updatedAt:string; completedAt?:string };
 type Roadmap = { id:string; title:string; category:string; progress:number; target:string; priority:Priority };
 type Announcement = { id:string; title:string; body:string; pinned:boolean; category:string; date:string; author?:string };
 type Resource = { id:string; title:string; url:string; description:string; category:string };
 type WorkspaceTag = { id:string; name:string; color:string };
 type EventItem = { id:string; text:string; actor:string; date:string };
-type Store = { workspace:string; logoUrl:string; accent:string; theme:string; columns:Column[]; tasks:Task[]; members:Member[]; roadmaps:Roadmap[]; announcements:Announcement[]; resources:Resource[]; tags:WorkspaceTag[]; events:EventItem[]; widgets:Record<string,boolean> };
+type Store = { workspace:string; logoUrl:string; accent:string; theme:string; completedTaskRetentionDays:number; columns:Column[]; tasks:Task[]; members:Member[]; roadmaps:Roadmap[]; announcements:Announcement[]; resources:Resource[]; tags:WorkspaceTag[]; events:EventItem[]; widgets:Record<string,boolean> };
 type WorkspaceProfile = { id:string; display_name:string; username:string|null; avatar_url:string|null; role:string; approved:boolean };
 type AuthProvider = "github";
 const uid=()=>Math.random().toString(36).slice(2,10);
@@ -22,18 +22,37 @@ const seed=(profile:WorkspaceProfile):Store=>{
  const profileName=profile.display_name||profile.username||"Member";
  const members:Member[]=[{id:profile.id,name:profileName,handle:profile.username?"@"+profile.username:"@"+profileName.replace(/\s+/g,""),role:profile.role,color:"#587d4a",status:"Online"}];
  const columns:Column[]=[{id:"backlog",title:"Backlog",color:"#7d8792"},{id:"todo",title:"To do",color:"#88954a"},{id:"doing",title:"In progress",color:"#75a252"},{id:"review",title:"Under review",color:"#a78753"},{id:"done",title:"Completed",color:"#4e956b"}];
- return {workspace:"Ja-Nee Management",logoUrl:"",accent:"#165209",theme:"dark",columns,tasks:[],members,
+ return {workspace:"Ja-Nee Management",logoUrl:"",accent:"#165209",theme:"dark",completedTaskRetentionDays:0,columns,tasks:[],members,
   roadmaps:[],announcements:[],resources:[],tags:[],events:[],widgets:{deadlines:true,activity:true,roadmap:true,members:true}};
 };
 function normalizeStore(value:unknown,profile:WorkspaceProfile):Store{
  const blank=seed(profile);
  if(!value||typeof value!=="object")return blank;
  const store=value as Partial<Store>;
- const tasks=Array.isArray(store.tasks)?store.tasks:[];
+ const tasks=Array.isArray(store.tasks)?store.tasks.map(task=>({...task,completedAt:typeof task.completedAt==="string"?task.completedAt:undefined})):[];
  const tags=Array.isArray(store.tags)?store.tags.filter(tag=>tag&&typeof tag.name==="string").map(tag=>({id:tag.id||"legacy-"+tag.name.toLowerCase(),name:tag.name,color:tag.color||"#75a252"})):[];
  const known=new Set(tags.map(tag=>tag.name.toLowerCase()));
  for(const name of new Set(tasks.flatMap(task=>Array.isArray(task.tags)?task.tags:[]))){if(name&&!known.has(name.toLowerCase())){tags.push({id:"legacy-"+name.toLowerCase(),name,color:"#75a252"});known.add(name.toLowerCase())}}
- return {...blank,...store,logoUrl:typeof store.logoUrl==="string"?store.logoUrl:"",columns:Array.isArray(store.columns)&&store.columns.length?store.columns:blank.columns,tasks,members:Array.isArray(store.members)?store.members:blank.members,roadmaps:Array.isArray(store.roadmaps)?store.roadmaps:[],announcements:Array.isArray(store.announcements)?store.announcements:[],resources:Array.isArray(store.resources)?store.resources:[],tags,events:Array.isArray(store.events)?store.events:[],widgets:store.widgets&&typeof store.widgets==="object"?store.widgets:blank.widgets};
+ const retentionOptions=[0,1,3,7,14,30,60,90];
+ return {...blank,...store,logoUrl:typeof store.logoUrl==="string"?store.logoUrl:"",completedTaskRetentionDays:retentionOptions.includes(Number(store.completedTaskRetentionDays))?Number(store.completedTaskRetentionDays):0,columns:Array.isArray(store.columns)&&store.columns.length?store.columns:blank.columns,tasks,members:Array.isArray(store.members)?store.members:blank.members,roadmaps:Array.isArray(store.roadmaps)?store.roadmaps:[],announcements:Array.isArray(store.announcements)?store.announcements:[],resources:Array.isArray(store.resources)?store.resources:[],tags,events:Array.isArray(store.events)?store.events:[],widgets:store.widgets&&typeof store.widgets==="object"?store.widgets:blank.widgets};
+}
+function mergeLocalWorkspaceChanges(base:Store,local:Store,remote:Store):Store{
+ const merged={...remote};
+ const baseRecord=base as unknown as Record<string,unknown>;const localRecord=local as unknown as Record<string,unknown>;const remoteRecord=remote as unknown as Record<string,unknown>;const mergedRecord=merged as unknown as Record<string,unknown>;
+ const collections=["tasks","columns","roadmaps","announcements","resources","tags","events"] as const;
+ for(const key of collections){
+  const before=(baseRecord[key] as {id:string}[]|undefined)??[];const current=(localRecord[key] as {id:string}[]|undefined)??[];const latest=(remoteRecord[key] as {id:string}[]|undefined)??[];
+  const beforeById=new Map(before.map(item=>[item.id,item]));const currentById=new Map(current.map(item=>[item.id,item]));const latestById=new Map(latest.map(item=>[item.id,item]));
+  for(const item of before)if(!currentById.has(item.id))latestById.delete(item.id);
+  for(const item of current){const original=beforeById.get(item.id);if(!original||JSON.stringify(original)!==JSON.stringify(item))latestById.set(item.id,item)}
+  let items=[...latestById.values()];
+  if(key==="tasks"&&JSON.stringify(before.map(item=>item.id))!==JSON.stringify(current.map(item=>item.id))){const order=new Map(current.map((item,index)=>[item.id,index]));items.sort((a,b)=>(order.get(a.id)??Number.MAX_SAFE_INTEGER)-(order.get(b.id)??Number.MAX_SAFE_INTEGER))}
+  mergedRecord[key]=items;
+ }
+ const scalarKeys=["workspace","logoUrl","accent","theme","completedTaskRetentionDays"];
+ for(const key of scalarKeys)if(JSON.stringify(baseRecord[key])!==JSON.stringify(localRecord[key]))mergedRecord[key]=localRecord[key];
+ if(JSON.stringify(base.widgets)!==JSON.stringify(local.widgets)){const widgets={...remote.widgets};for(const [key,value] of Object.entries(local.widgets))if(base.widgets[key]!==value)widgets[key]=value;merged.widgets=widgets}
+ return merged;
 }
 type ChangeNotice={entity:string;action:"created"|"updated"|"deleted";title:string;detail?:string;assigneeIds:string[]};
 function changesBetween(before:Store,after:Store):ChangeNotice[]{
@@ -64,7 +83,7 @@ function changesBetween(before:Store,after:Store):ChangeNotice[]{
  compare(before.resources,after.resources,"resource",item=>item.title);
  compare(before.tags,after.tags,"tag",item=>item.name);
  compare(before.columns,after.columns,"board column",item=>item.title);
- if(before.workspace!==after.workspace||before.logoUrl!==after.logoUrl||before.accent!==after.accent||before.theme!==after.theme||JSON.stringify(before.widgets)!==JSON.stringify(after.widgets))changes.push({entity:"workspace settings",action:"updated",title:after.workspace||"Workspace",detail:before.logoUrl!==after.logoUrl?"Workspace logo updated.":"Workspace appearance or dashboard preferences updated.",assigneeIds:[]});
+ if(before.workspace!==after.workspace||before.logoUrl!==after.logoUrl||before.accent!==after.accent||before.theme!==after.theme||before.completedTaskRetentionDays!==after.completedTaskRetentionDays||JSON.stringify(before.widgets)!==JSON.stringify(after.widgets))changes.push({entity:"workspace settings",action:"updated",title:after.workspace||"Workspace",detail:before.logoUrl!==after.logoUrl?"Workspace logo updated.":"Workspace appearance or dashboard preferences updated.",assigneeIds:[]});
  return changes;
 }
 const initials=(s:string)=>s.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();
@@ -152,8 +171,8 @@ export default function App(){
 
 function Dashboard({user,profile,initialData,workspaceExists,onSignOut}:{user:User;profile:WorkspaceProfile;initialData:Store;workspaceExists:boolean;onSignOut:()=>Promise<void>}){
  const [data,setData]=useState<Store>(initialData);const [page,setPage]=useState<Page>("Overview");const [query,setQuery]=useState("");const [taskId,setTaskId]=useState<string|null>(null);const [creating,setCreating]=useState(false);const [filter,setFilter]=useState("All priorities");const [assigneeFilter,setAssigneeFilter]=useState("Everyone");const [sort,setSort]=useState("Manual");const [drag,setDrag]=useState<string|null>(null);const [toast,setToast]=useState("");const [menu,setMenu]=useState(false);const [collapsed,setCollapsed]=useState(false);const [mobile,setMobile]=useState(false);const [syncStatus,setSyncStatus]=useState<"saved"|"saving"|"error">("saved");
- const clientId=useRef(uid());const savedSnapshot=useRef(workspaceExists?JSON.stringify(initialData):"");const remoteSnapshot=useRef<string|null>(null);const membersRef=useRef(data.members);const savedData=useRef<Store|null>(workspaceExists?initialData:null);const [onlineProfileIds,setOnlineProfileIds]=useState<string[]>([]);const notificationWarningShown=useRef(false);
- useEffect(()=>{membersRef.current=data.members},[data.members]);
+ const clientId=useRef(uid());const savedSnapshot=useRef(workspaceExists?JSON.stringify(initialData):"");const remoteSnapshot=useRef<string|null>(null);const membersRef=useRef(data.members);const currentData=useRef(data);const savedData=useRef<Store|null>(workspaceExists?initialData:null);const [onlineProfileIds,setOnlineProfileIds]=useState<string[]>([]);const notificationWarningShown=useRef(false);
+ useEffect(()=>{membersRef.current=data.members;currentData.current=data},[data]);
  useEffect(()=>{
   const snapshot=JSON.stringify(data);
   if(snapshot===savedSnapshot.current)return;
@@ -177,17 +196,51 @@ function Dashboard({user,profile,initialData,workspaceExists,onSignOut}:{user:Us
   return()=>clearTimeout(timer);
  },[data,user.id]);
  useEffect(()=>{
-  const channel=supabase!.channel("workspace-state-main").on("postgres_changes",{event:"*",schema:"public",table:"workspace_state",filter:"id=eq.main"},(payload)=>{
-   if(payload.eventType==="DELETE")return;
-   const row=payload.new as WorkspaceRow;
+  let alive=true;let refreshing=false;
+  const applyRemoteRow=(row:WorkspaceRow)=>{
    if(row.updated_by_client===clientId.current)return;
    const incoming=normalizeStore(row.data,profile);incoming.members=membersRef.current;
-   const snapshot=JSON.stringify(incoming);
-   remoteSnapshot.current=snapshot;savedSnapshot.current=snapshot;savedData.current=incoming;
-   setData(previous=>JSON.stringify(previous)===snapshot?previous:incoming);setSyncStatus("saved");
-  }).subscribe();
-  return()=>{void supabase!.removeChannel(channel)};
+   const remoteState=JSON.stringify(incoming);if(remoteState===savedSnapshot.current){setSyncStatus(current=>current==="error"?(JSON.stringify(currentData.current)===savedSnapshot.current?"saved":"saving"):current);return}
+   const local=currentData.current;const localState=JSON.stringify(local);const hasLocalChanges=localState!==savedSnapshot.current;const baseline=savedData.current;
+   const next=hasLocalChanges&&baseline?mergeLocalWorkspaceChanges(baseline,local,incoming):incoming;const nextState=JSON.stringify(next);
+   remoteSnapshot.current=remoteState;savedSnapshot.current=remoteState;savedData.current=incoming;
+   if(nextState===remoteState)remoteSnapshot.current=nextState;
+   currentData.current=next;setData(previous=>JSON.stringify(previous)===nextState?previous:next);setSyncStatus(nextState===remoteState?"saved":"saving");
+  };
+  const refresh=async()=>{
+   if(!alive||refreshing||document.visibilityState!=="visible")return;
+   refreshing=true;
+   try{
+    const {data:row,error}=await supabase!.from("workspace_state").select("data,updated_by_client").eq("id","main").maybeSingle();
+    if(!alive)return;
+    if(error){setSyncStatus("error");return}
+    if(row)applyRemoteRow(row as WorkspaceRow);else setSyncStatus(current=>current==="error"?"saved":current);
+   }catch{
+    if(alive)setSyncStatus("error");
+   }finally{refreshing=false}
+  };
+  const onResume=()=>{if(document.visibilityState==="visible")void refresh()};
+  const channel=supabase!.channel("workspace-state-main").on("postgres_changes",{event:"*",schema:"public",table:"workspace_state",filter:"id=eq.main"},payload=>{
+   if(payload.eventType!=="DELETE")applyRemoteRow(payload.new as WorkspaceRow);
+  }).subscribe(status=>{
+   if(status==="SUBSCRIBED")void refresh();
+   else if(status==="CHANNEL_ERROR"||status==="TIMED_OUT")setSyncStatus("error");
+  });
+  window.addEventListener("online",onResume);window.addEventListener("focus",onResume);document.addEventListener("visibilitychange",onResume);
+  const timer=window.setInterval(onResume,20000);
+  return()=>{alive=false;window.clearInterval(timer);window.removeEventListener("online",onResume);window.removeEventListener("focus",onResume);document.removeEventListener("visibilitychange",onResume);void supabase!.removeChannel(channel)};
  },[profile]);
+ useEffect(()=>{
+  const retention=data.completedTaskRetentionDays;if(!retention)return;
+  const removeExpired=()=>setData(current=>{
+   const completedIds=new Set(current.columns.filter(column=>/done|complete/i.test(column.title)).map(column=>column.id));const cutoff=Date.now()-retention*24*60*60*1000;
+   const expired=current.tasks.filter(task=>completedIds.has(task.columnId)&&Date.parse(task.completedAt??task.updatedAt??task.createdAt)<=cutoff);
+   if(!expired.length)return current;
+   const now=new Date().toISOString();const events=expired.map(task=>({id:uid(),text:`automatically removed “${task.title}” after ${retention} days in Completed`,actor:"Workspace cleanup",date:now}));const expiredIds=new Set(expired.map(task=>task.id));
+   return{...current,tasks:current.tasks.filter(task=>!expiredIds.has(task.id)),events:[...events,...current.events].slice(0,100)};
+  });
+  removeExpired();const timer=window.setInterval(removeExpired,60000);return()=>window.clearInterval(timer);
+ },[data.completedTaskRetentionDays,data.columns]);
  useEffect(()=>{
   if(!supabase)return;
   const client=supabase;
@@ -209,9 +262,9 @@ function Dashboard({user,profile,initialData,workspaceExists,onSignOut}:{user:Us
   ...data.announcements.filter(a=>(a.title+" "+a.body).toLowerCase().includes(q)).map(a=>({id:a.id,title:a.title,page:"Announcements" as Page,task:false})),
   ...data.roadmaps.filter(r=>r.title.toLowerCase().includes(q)).map(r=>({id:r.id,title:r.title,page:"Roadmaps" as Page,task:false}))
  ].slice(0,7)},[data,query]);
- const saveTask=(draft:Omit<Task,"createdAt"|"updatedAt">)=>{const old=data.tasks.find(t=>t.id===draft.id);const now=new Date().toISOString();const saved:Task={...draft,title:draft.title.trim(),createdAt:old?.createdAt??now,updatedAt:now};const eventText=old&&old.columnId!==saved.columnId?"moved “"+saved.title+"” from "+(data.columns.find(c=>c.id===old.columnId)?.title??"Unknown")+" to "+(data.columns.find(c=>c.id===saved.columnId)?.title??"Unknown"):(old?"updated ":"created ")+"“"+saved.title+"”";setData(d=>({...d,tasks:old?d.tasks.map(t=>t.id===saved.id?saved:t):[saved,...d.tasks],events:[{id:uid(),text:eventText,actor,date:now},...d.events]}));setTaskId(null);setCreating(false);setToast(old?"Task updated":"Task created")};
+ const saveTask=(draft:Omit<Task,"createdAt"|"updatedAt">)=>{const old=data.tasks.find(t=>t.id===draft.id);const now=new Date().toISOString();const completedIds=new Set(data.columns.filter(column=>/done|complete/i.test(column.title)).map(column=>column.id));const wasCompleted=!!old&&completedIds.has(old.columnId);const isCompleted=completedIds.has(draft.columnId);const saved:Task={...draft,title:draft.title.trim(),createdAt:old?.createdAt??now,updatedAt:now,completedAt:isCompleted?(wasCompleted?old?.completedAt??old?.updatedAt:now):undefined};const eventText=old&&old.columnId!==saved.columnId?"moved “"+saved.title+"” from "+(data.columns.find(c=>c.id===old.columnId)?.title??"Unknown")+" to "+(data.columns.find(c=>c.id===saved.columnId)?.title??"Unknown"):(old?"updated ":"created ")+"“"+saved.title+"”";setData(d=>({...d,tasks:old?d.tasks.map(t=>t.id===saved.id?saved:t):[saved,...d.tasks],events:[{id:uid(),text:eventText,actor,date:now},...d.events]}));setTaskId(null);setCreating(false);setToast(old?"Task updated":"Task created")};
  const deleteTask=(id:string)=>{const old=data.tasks.find(t=>t.id===id);if(!old)return;setData(d=>({...d,tasks:d.tasks.filter(t=>t.id!==id),events:[{id:uid(),text:"deleted “"+old.title+"”",actor,date:new Date().toISOString()},...d.events]}));setTaskId(null);setToast("Task deleted")};
- const move=(id:string,col:string,before?:string)=>{const item=data.tasks.find(t=>t.id===id);if(!item)return;const from=data.columns.find(c=>c.id===item.columnId)?.title;const to=data.columns.find(c=>c.id===col)?.title;if(item.columnId===col&&(!before||before===id))return;setData(d=>{const tasks=d.tasks.filter(t=>t.id!==id);const at=before?tasks.findIndex(t=>t.id===before):-1;tasks.splice(at<0?tasks.length:at,0,{...item,columnId:col,updatedAt:new Date().toISOString()});const events=item.columnId===col?d.events:[{id:uid(),text:"moved “"+item.title+"” from "+from+" to "+to,actor,date:new Date().toISOString()},...d.events];return{...d,tasks,events}})};
+ const move=(id:string,col:string,before?:string)=>{const item=data.tasks.find(t=>t.id===id);if(!item)return;const from=data.columns.find(c=>c.id===item.columnId)?.title;const to=data.columns.find(c=>c.id===col)?.title;if(item.columnId===col&&(!before||before===id))return;setData(d=>{const tasks=d.tasks.filter(t=>t.id!==id);const at=before?tasks.findIndex(t=>t.id===before):-1;const now=new Date().toISOString();const wasCompleted=/done|complete/i.test(from??"");const isCompleted=/done|complete/i.test(to??"");const moved:Task={...item,columnId:col,updatedAt:now,completedAt:isCompleted?(wasCompleted?item.completedAt??item.updatedAt:now):undefined};tasks.splice(at<0?tasks.length:at,0,moved);const events=item.columnId===col?d.events:[{id:uid(),text:"moved “"+item.title+"” from "+from+" to "+to,actor,date:now},...d.events];return{...d,tasks,events}})};
  const addColumn=()=>{const title=prompt("New column name");if(title?.trim())setData(d=>({...d,columns:[...d.columns,{id:uid(),title:title.trim(),color:"#75a252"}]}))};
  const editColumn=(c:Column,remove=false)=>{if(remove){if(data.columns.length<2){setToast("Keep at least one column");return}if(!confirm("Delete "+c.title+"? Its cards move to the first column."))return;const fallback=data.columns.find(x=>x.id!==c.id)!;setData(d=>({...d,columns:d.columns.filter(x=>x.id!==c.id),tasks:d.tasks.map(t=>t.columnId===c.id?{...t,columnId:fallback.id}:t)}));log("deleted column “"+c.title+"”");return}const title=prompt("Rename column",c.title);if(title?.trim())setData(d=>({...d,columns:d.columns.map(x=>x.id===c.id?{...x,title:title.trim()}:x)}))};
  const addAnnouncement=()=>{const title=prompt("Announcement title");if(!title?.trim())return;const body=prompt("Announcement message");if(!body?.trim())return;const a:Announcement={id:uid(),title:title.trim(),body:body.trim(),pinned:false,category:"Team",date:new Date().toISOString(),author:actor};setData(d=>({...d,announcements:[a,...d.announcements]}));log("published announcement “"+a.title+"”")};
@@ -297,5 +350,6 @@ function SettingsPage({data,onChange,profile,syncStatus,onSignOut}:{data:Store;o
  return <div className="section"><Heading eyebrow="MAKE IT YOURS" title="Settings" description="Configure your shared workspace."/><div className="settings-grid"><div><section className="settings-card"><h3>Workspace appearance</h3><p>These preferences are shared with approved members.</p><label>Workspace name<input value={data.workspace} onChange={e=>onChange({workspace:e.target.value})}/></label><label>Accent colour<input type="color" value={data.accent} onChange={e=>onChange({accent:e.target.value})}/></label><div className="theme-tools"><button className="button outline" onClick={()=>onChange({theme:"dark"})}>Dark mode</button><button className="button outline" onClick={()=>onChange({theme:"light"})}>Light mode</button></div></section>
  <section className="settings-card"><h3>Workspace logo</h3><p>Choose a small image for the top left of the dashboard. It will be shared with your team.</p><div className="logo-setting"><BrandLogo src={data.logoUrl}/><div className="logo-setting-copy"><b>{data.logoUrl?"Custom logo":"Default Ja-Nee logo"}</b><small>PNG, JPG, or WebP · resized for the workspace</small></div><input ref={logoInput} className="logo-file-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={event=>void uploadLogo(event)}/><button className="button outline" onClick={()=>logoInput.current?.click()}>Upload image</button>{data.logoUrl&&<button className="button outline" onClick={()=>{onChange({logoUrl:""});setLogoError("")}}>Use default</button>}</div>{logoError&&<small className="tag-error">{logoError}</small>}</section>
  <section className="settings-card tag-settings"><h3>Task tags</h3><p>Create shared tags with colors. Teammates can assign these tags when creating or editing tasks.</p><div className="tag-create"><input value={tagName} onChange={e=>{setTagName(e.target.value);setTagError("")}} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();addTag()}}} placeholder="Tag name" aria-label="New tag name"/><input type="color" value={tagColor} onChange={e=>setTagColor(e.target.value)} aria-label="New tag color"/><button className="button primary" onClick={addTag} disabled={!tagName.trim()}><Plus size={14}/>Add tag</button></div>{tagError&&<small className="tag-error">{tagError}</small>}<div className="tag-list">{data.tags.map(tag=><div className="tag-setting-row" key={tag.id}><span className="tag-swatch" style={{background:tag.color}}/><input className="tag-name-input" value={tag.name} onChange={e=>updateTag(tag,{name:e.target.value})} aria-label={`Rename ${tag.name}`}/><input type="color" value={tag.color} onChange={e=>updateTag(tag,{color:e.target.value})} aria-label={`Change ${tag.name} color`}/><button className="icon-btn" type="button" onClick={()=>removeTag(tag)} aria-label={`Delete ${tag.name}`}><Trash2 size={15}/></button></div>)}{!data.tags.length&&<p className="tag-empty">Your saved tags will appear here.</p>}</div></section>
+ <section className="settings-card"><h3>Completed task cleanup</h3><p>Automatically remove cards after they have stayed in a completed column for the selected time.</p><label className="retention-setting">Delete completed cards after<select value={data.completedTaskRetentionDays} onChange={event=>onChange({completedTaskRetentionDays:Number(event.target.value)})}><option value={0}>Never</option><option value={1}>1 day</option><option value={3}>3 days</option><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={60}>60 days</option><option value={90}>90 days</option></select></label><small className="retention-note">The timer starts when a card is moved to a Completed or Done column. Cleanup runs while a teammate has the dashboard open; expired cards are removed the next time it is opened.</small></section>
  <section className="settings-card"><h3>Overview widgets</h3>{Object.entries({deadlines:"Upcoming deadlines",activity:"Recent activity",roadmap:"Roadmap progress",members:"Team presence"}).map(([k,v])=><label className="toggle-line" key={k}>{v}<input type="checkbox" checked={!!data.widgets[k]} onChange={()=>onChange({widgets:{...data.widgets,[k]:!data.widgets[k]}})}/></label>)}</section></div><aside><section className="settings-card"><h3>Account</h3><p>Signed in with a connected OAuth provider.</p><div className="integration"><b>{profile.display_name||profile.username||"Team member"}</b><small>{profile.username?"@"+profile.username:profile.id}</small></div><div className="integration">Workspace access<small>{roleName(profile.role)} · approved</small></div><button className="button outline signout-button" onClick={()=>void onSignOut()}><LogOut size={13}/>Sign out</button></section><section className="settings-card"><h3>Connected services</h3><p>Sign-in uses GitHub. Discord receives workspace change notices through a secure webhook.</p><div className="integration">Supabase database<small>{syncLabel}</small></div><div className="integration">GitHub sign-in<small>Connected through Supabase Authentication</small></div><div className="integration">Discord change log<small>Webhook notifications are sent securely by Supabase</small></div></section></aside></div></div>
 }

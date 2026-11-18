@@ -40,3 +40,23 @@
 .logo.logo-image{overflow:hidden;border:1px solid #ffffff1c;background:#182019;color:transparent;box-shadow:0 4px 14px #0003}.logo.logo-image img{display:block;width:100%;height:100%;object-fit:contain;border-radius:inherit}.logo.logo-image i{display:none}.logo-setting{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--surface) 80%,transparent)}.logo-setting>.logo{width:48px;height:48px;flex-basis:48px;border-radius:13px}.logo-setting-copy{display:flex;flex:1;min-width:170px;flex-direction:column;gap:4px}.logo-setting-copy b{font-size:12px;line-height:1.4}.logo-setting-copy small{color:#849087;font-size:10px;line-height:1.45}.logo-setting .button{min-height:36px}.logo-file-input{display:none!important}
 @media(max-width:950px){.settings-grid{grid-template-columns:1fr}.content{padding-inline:22px}.topbar{padding-inline:18px}}
 @media(max-width:610px){.content{padding:18px 14px 30px}.heading{align-items:flex-start;padding-inline:0}.heading>div{width:100%}.heading>.button{width:100%}.topbar{gap:6px}.top-actions{flex-shrink:0}.searchbox{min-width:30px;flex:0 0 30px}.searchbox:focus-within{min-width:0;flex:1}.board-tools select{flex:1 1 135px}.logo-setting{gap:9px}.logo-setting-copy{flex-basis:calc(100% - 65px)}.logo-setting>.button{flex:1}}
+
+/* Keep stat labels in normal layout flow so they never collide with their values. */
+.stat{display:grid;grid-template-columns:38px minmax(0,1fr);grid-template-rows:auto auto auto;align-content:start;gap:8px 10px}
+.stat>span{grid-column:1;grid-row:1;flex-shrink:0}
+.stat>small{position:static;grid-column:2;grid-row:1;align-self:center;margin:0;line-height:1.35;overflow-wrap:anywhere}
+.stat>b{grid-column:1/-1;grid-row:2;margin:1px 0 0;line-height:1.15}
+.stat>em{grid-column:1/-1;grid-row:3;line-height:1.4;overflow-wrap:anywhere}
+.task-form aside{min-width:0}
+.task-form fieldset{width:100%;min-width:0}
+.task-form aside .assignee{display:flex!important;flex-direction:row!important;align-items:center!important;min-width:0;gap:8px!important;line-height:1.3}
+.task-form aside .assignee input[type=checkbox]{width:16px;min-width:16px;height:16px;flex:0 0 16px;margin:0;padding:0}
+.task-form aside .assignee .avatar{width:25px;height:25px;flex:0 0 25px}
+.task-form aside .assignee{overflow-wrap:anywhere}
+.tag-picker{min-width:0}
+.task-form .tag-option{flex-direction:row!important;align-items:center!important;min-width:0;line-height:1.35}
+.task-form .tag-option input[type=checkbox]{width:16px;min-width:16px;height:16px;flex:0 0 16px}
+.settings-card .retention-setting{display:grid;grid-template-columns:minmax(0,1fr) minmax(130px,200px);align-items:center;gap:12px;margin:12px 0 5px}
+.settings-card .retention-setting select{width:100%;min-width:0;padding:9px 10px;border:1px solid #333c35;border-radius:7px;background:#151b16;color:inherit;font-size:12px}
+.retention-note{display:block;color:#849087;font-size:11px;line-height:1.5}
+@media(max-width:610px){.settings-card .retention-setting{grid-template-columns:1fr;gap:6px}.stat{grid-template-columns:30px minmax(0,1fr);gap:7px 8px}.task-form aside .assignee{font-size:12px!important}}

@@ -90,6 +90,8 @@ The included Pages workflow reads those variables when it builds. Push a commit 
 ## Data and access
 
 - Approved members sign in with GitHub and share one workspace document through Supabase Realtime. Live team status comes from Supabase Realtime Presence and goes offline when their session disconnects. Workspace Settings can upload a small shared logo used in the dashboard sidebar.
+- The dashboard refreshes shared workspace data when Realtime reconnects, when a tab becomes active again, and every 20 seconds while it is open. It keeps unsaved local edits when merging an incoming update.
+- Workspace Settings can automatically delete completed tasks after 1, 3, 7, 14, 30, 60, or 90 days. Cleanup runs while an approved member has the dashboard open; overdue cards are removed on the next visit if everyone was offline when the timer elapsed. Choose **Never** to disable it.
 - New accounts remain blocked until an owner approves them. The first owner must be approved in the trusted Supabase SQL Editor.
 - Row-level security protects the database; the browser uses only the publishable key. The Discord webhook and Supabase service credentials remain on the server side.
 - The current app saves one shared workspace JSON document. If several people edit the same item at once, a later database save can replace an earlier one; a later database increment should move the busiest records to separate relational tables.
