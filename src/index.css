@@ -267,9 +267,9 @@ button:hover>svg,.button:hover>svg{transform:scale(1.08)}
 .event>.avatar>img{inset:0;width:100%;height:100%;max-width:100%;object-fit:cover}
 
 /* Discord-inspired charcoal surfaces with Ja-Nee green reserved for status and actions. */
-.app{--discord-main:#313338;--discord-sidebar:#1e1f22;--discord-surface:#2b2d31;--discord-raised:#383a40;--discord-line:#3f4147;--line:var(--discord-line);--surface:var(--discord-surface);background:var(--discord-main);color:#f2f3f5}
-.main{background:var(--discord-main)}
-.sidebar{background:var(--discord-sidebar);border-right:1px solid #17181a}
+.app{--discord-main:#111512;--discord-sidebar:#151a16;--discord-surface:#2b2d31;--discord-raised:#383a40;--discord-line:#3f4147;--line:var(--discord-line);--surface:var(--discord-surface);background:radial-gradient(ellipse at 78% -25%,#29412c44,transparent 36%),var(--discord-main);color:#f2f3f5}
+.main{background:transparent}
+.sidebar{background:linear-gradient(180deg,#171d18,#131814 72%);border-right:1px solid #29342b}
 .brand{margin-bottom:3px}
 .workspace{border-color:#292a2e;background:#232428}
 .nav-caption,.online-caption{color:#949ba4}
@@ -280,7 +280,7 @@ button:hover>svg,.button:hover>svg{transform:scale(1.08)}
 .nav-item em{background:#232428;color:#c7cacf}
 .private-card{border-color:#34373d;background:#26282d;color:#a9cb8d}
 .private-card b{color:#e2e5e9}
-.topbar{background:#313338f2;border-color:#292a2e}
+.topbar{background:#111512ed;border-color:#29342b}
 .searchbox{border-color:#202125;background:#1e1f22;color:#b5bac1}
 .searchbox:focus-within{border-color:#647b58;box-shadow:0 0 0 2px #6b8a5930}
 .bell{border-color:#45474e;background:#2b2d31}
@@ -321,4 +321,4 @@ button:hover>svg,.button:hover>svg{transform:scale(1.08)}
 .light .nav-item:hover,.light .nav-item.active{background:#e8e9ec;color:#2e3338}
 .light .stat,.light .overview-grid .panel,.light .quick>button,.light .roadmap-card,.light .settings-card,.light .member-card,.light .resource-card,.light .task-card,.light .announcement,.light .pinned-announcements{border-color:#d9dce1;background:#fff;color:#2e3338}
 .light .event,.light .event b,.light .member-line b{color:#3f434a}
-@media(max-width:610px){.app{--discord-main:#313338}.event>.avatar{width:28px;height:28px;min-width:28px;flex-basis:28px}.event .avatar.small{width:28px;height:28px}}
+@media(max-width:610px){.app{--discord-main:#111512}.event>.avatar{width:28px;height:28px;min-width:28px;flex-basis:28px}.event .avatar.small{width:28px;height:28px}}
