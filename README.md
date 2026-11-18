@@ -47,7 +47,7 @@ Roles are `owner`, `administrator`, `management`, `developer`, and `viewer`.
 
 ## Discord change log and assignee mentions
 
-This dashboard posts a Discord message after a shared change is saved. It records task, roadmap, announcement, resource, tag, board-column, and workspace-setting changes. When a changed task has assigned teammates with linked Discord IDs, the message mentions them. The webhook URL stays in Supabase and is never included in the browser build.
+This dashboard posts a Discord embed after a shared change is saved. It records task, roadmap, announcement, resource, tag, board-column, and workspace-setting changes. Assigned Discord users are pinged in the message text above the embed; the embed shows the change, assignee names, and actor. Each assignee needs a linked Discord User ID. The webhook URL stays in Supabase and is never included in the browser build.
 
 1. In your Discord server, open the destination text channel's **Edit Channel → Integrations → Webhooks**, create a webhook, choose the channel, and copy its URL. Keep that URL private.
 2. In Supabase, open **Edge Functions → Secrets** and add:
@@ -89,7 +89,7 @@ The included Pages workflow reads those variables when it builds. Push a commit 
 
 ## Data and access
 
-- Approved members sign in with GitHub and share one workspace document through Supabase Realtime. Live team status comes from Supabase Realtime Presence and goes offline when their session disconnects.
+- Approved members sign in with GitHub and share one workspace document through Supabase Realtime. Live team status comes from Supabase Realtime Presence and goes offline when their session disconnects. Workspace Settings can upload a small shared logo used in the dashboard sidebar.
 - New accounts remain blocked until an owner approves them. The first owner must be approved in the trusted Supabase SQL Editor.
 - Row-level security protects the database; the browser uses only the publishable key. The Discord webhook and Supabase service credentials remain on the server side.
 - The current app saves one shared workspace JSON document. If several people edit the same item at once, a later database save can replace an earlier one; a later database increment should move the busiest records to separate relational tables.
