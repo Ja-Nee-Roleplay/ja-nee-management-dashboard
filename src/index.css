@@ -159,6 +159,19 @@ input[type=checkbox]:disabled{opacity:.5;cursor:not-allowed}
 .tag-picker .tag-option{padding:2px 3px;border-radius:7px;transition:background-color .16s ease}
 .tag-picker .tag-option:hover{background:#ffffff09}
 @media(max-width:760px){.description-preview{max-height:200px}.markdown-content{font-size:12px}}
+.discussion-list .comment{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 8px;margin:7px 0;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--surface) 78%,transparent);line-height:1.45}
+.discussion-list .comment strong{color:#cfddca;font-size:11px}
+.discussion-list .comment span{grid-column:1/-1;white-space:pre-wrap;overflow-wrap:anywhere}
+.discussion-list .comment small{grid-column:1/-1;justify-self:end;color:#849087;font-size:10px}
+.discussion-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.discussion-heading>b{font-size:11px}
+.comment-sync{font-size:10px}
+.comment-sync.saved{color:#91b97d}
+.comment-sync.saving{color:#d7b477}
+.comment-sync.error{color:#dc9186}
+.discussion-list .add-check{margin-top:10px}
+.discussion-list .add-check button:disabled{opacity:.42;cursor:not-allowed;box-shadow:none}
+.light .discussion-list .comment strong{color:#394a36}
 .sidebar.collapsed .brand>.logo{width:32px;flex-basis:32px}
 .sidebar.collapsed .brand>.collapse{width:21px;height:21px;flex-basis:21px;padding:0}
 .collapse{transform:none!important}
