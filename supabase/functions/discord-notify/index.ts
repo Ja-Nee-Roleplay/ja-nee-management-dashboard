@@ -28,6 +28,16 @@ function clean(value: string, maxLength: number): string {
   return Array.from(value, character => { const code = character.charCodeAt(0); return code < 32 || code === 127 ? " " : character; }).join("").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+function safeHttpsUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const actionLabels: Record<string, string> = {
   created: "Created",
   updated: "Updated",
@@ -92,6 +102,14 @@ Deno.serve(async (request) => {
     }
     if (!profile?.approved) return json({ error: "An approved workspace account is required." }, 403);
 
+    const { data: workspaceRow } = await admin
+      .from("workspace_state")
+      .select("data")
+      .eq("id", "main")
+      .maybeSingle();
+    const workspaceData = workspaceRow?.data as { logoUrl?: unknown } | undefined;
+    const workspaceLogo = safeHttpsUrl(workspaceData?.logoUrl);
+
     const webhookUrl = Deno.env.get("DISCORD_WEBHOOK_URL");
     if (!webhookUrl) return json({ ok: true, skipped: "Discord webhook is not configured yet." });
     if (!/^https:\/\/discord(?:app)?\.com\/api\/webhooks\//i.test(webhookUrl)) {
@@ -106,6 +124,7 @@ Deno.serve(async (request) => {
       detail?: unknown;
       workspace?: unknown;
       assigneeIds?: unknown;
+      imagePath?: unknown;
     };
     const action = typeof input.action === "string" && Object.hasOwn(actionLabels, input.action) ? input.action : "";
     const entity = typeof input.entity === "string" && Object.hasOwn(entityLabels, input.entity) ? input.entity : "";
@@ -138,20 +157,36 @@ Deno.serve(async (request) => {
 
     const actor = clean(profile.display_name || "A teammate", 80);
     const moved = entity === "task" && action === "updated" && detail.startsWith("Status:");
-    const cardTitle = moved ? "🔄 Card moved" : `${entityIcons[entity]} ${entityLabels[entity]} ${actionLabels[action].toLowerCase()}`;
+    const cardTitle = moved ? "🔄 Card moved" : `${entityIcons[entity]} ${entityLabels[entity]} ${actionLabels[action]}`;
     const fields: { name: string; value: string; inline?: boolean }[] = [];
-    if (detail) fields.push({ name: moved ? "Status change" : "Change details", value: detail, inline: false });
-    if (assigneeNames.length) fields.push({ name: "Assignees", value: assigneeNames.join(", ").slice(0, 900), inline: true });
-    fields.push({ name: "Changed by", value: actor, inline: true });
+    if (detail) fields.push({ name: moved ? "↗ STATUS" : "✦ CHANGE SUMMARY", value: detail, inline: false });
+    if (assigneeNames.length) fields.push({ name: "👥 ASSIGNEES", value: assigneeNames.join(", ").slice(0, 900), inline: true });
+    fields.push({ name: "✍️ UPDATED BY", value: actor, inline: true });
+
+    let attachmentUrl: string | undefined;
+    const imagePath = typeof input.imagePath === "string"
+      && /^[0-9a-f-]{36}\/[a-zA-Z0-9._-]{1,110}$/i.test(input.imagePath)
+      ? input.imagePath
+      : undefined;
+    if (entity === "announcement" && imagePath) {
+      const { data: signedImage, error: imageError } = await admin
+        .storage
+        .from("announcement-images")
+        .createSignedUrl(imagePath, 3600);
+      if (!imageError) attachmentUrl = safeHttpsUrl(signedImage?.signedUrl);
+      else console.error("Could not sign announcement image for Discord:", imageError.message);
+    }
 
     const content = mentionIds.map((id) => `<@${id}>`).join(" ");
     const embed = {
-      author: { name: "JA-NEE • MANAGEMENT" },
+      author: { name: "JA-NEE • MANAGEMENT", ...(workspaceLogo ? { icon_url: workspaceLogo } : {}) },
       title: cardTitle,
       description: `**${title}**`,
-      color: action === "deleted" ? 0xc95f55 : moved ? 0x5597dc : 0x84ad68,
+      color: action === "deleted" ? 0xc9675e : moved ? 0x65a9e8 : entity === "announcement" ? 0x8bb76b : 0x729d5c,
       fields,
-      footer: { text: `Ja-Nee Roleplay • ${workspace}` },
+      ...(workspaceLogo ? { thumbnail: { url: workspaceLogo } } : {}),
+      ...(attachmentUrl ? { image: { url: attachmentUrl } } : {}),
+      footer: { text: `JA-NEE ROLEPLAY  ·  ${workspace}` },
       timestamp: new Date().toISOString(),
     };
     const response = await fetch(`${webhookUrl}${webhookUrl.includes("?") ? "&" : "?"}wait=true`, {

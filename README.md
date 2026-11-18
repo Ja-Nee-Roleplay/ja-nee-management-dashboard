@@ -21,13 +21,14 @@ The publishable key is intended for browser use. Never put a Supabase secret/ser
 
 1. Create a Supabase project.
 2. Open **SQL Editor**, paste and run [`supabase/schema.sql`](supabase/schema.sql) once. It creates the tables, access rules, profile trigger, and realtime workspace updates.
-3. In **Authentication → URL Configuration**, set the Site URL to the deployed Pages URL:
+3. Run [`supabase/announcements_storage.sql`](supabase/announcements_storage.sql) and [`supabase/weekly_activity_cleanup.sql`](supabase/weekly_activity_cleanup.sql) in the SQL Editor. These create private image storage for announcements and schedule activity-feed cleanup for Mondays at 00:00 South African time. Cleanup clears only `workspace_state.data.events`; tasks and other workspace data are untouched. The cleanup uses Supabase Cron (`pg_cron`).
+4. In **Authentication → URL Configuration**, set the Site URL to the deployed Pages URL:
 
    `https://ja-nee-roleplay.github.io/ja-nee-management-dashboard/`
 
    Add that URL and `http://localhost:5173/` to the allowed redirect URLs.
-4. In **Authentication → Providers**, enable **GitHub**. Create a GitHub OAuth app and use the callback URL displayed by Supabase (usually `https://YOUR-PROJECT-REF.supabase.co/auth/v1/callback`) as the OAuth callback URL. Enter the GitHub client ID and secret in Supabase. The dashboard only offers GitHub sign-in.
-5. Sign in to the dashboard once. The profile starts unapproved. In **Authentication → Users**, copy your user UUID. In the Supabase SQL Editor, approve yourself as the first owner:
+5. In **Authentication → Providers**, enable **GitHub**. Create a GitHub OAuth app and use the callback URL displayed by Supabase (usually `https://YOUR-PROJECT-REF.supabase.co/auth/v1/callback`) as the OAuth callback URL. Enter the GitHub client ID and secret in Supabase. The dashboard only offers GitHub sign-in.
+6. Sign in to the dashboard once. The profile starts unapproved. In **Authentication → Users**, copy your user UUID. In the Supabase SQL Editor, approve yourself as the first owner:
 
    ```sql
    update public.profiles
@@ -35,7 +36,7 @@ The publishable key is intended for browser use. Never put a Supabase secret/ser
    where id = 'PASTE-YOUR-USER-UUID-HERE';
    ```
 
-6. Have teammates sign in once, then approve each account by UUID and choose a role. For example:
+7. Have teammates sign in once, then approve each account by UUID and choose a role. For example:
 
    ```sql
    update public.profiles
@@ -63,6 +64,8 @@ This dashboard posts a Discord embed after a shared change is saved. It records 
    npx supabase link --project-ref YOUR_PROJECT_REF
    npx supabase functions deploy discord-notify
    ```
+
+   Redeploy this function after dashboard notification changes so Discord embeds can include announcement attachments and the current workspace logo.
 
    The project ref is the first part of your Supabase project URL, before `.supabase.co`. Leave the function's JWT verification enabled; only a signed-in, approved dashboard member can send a change notice.
 4. Link each teammate's Discord account to their dashboard profile. In Discord, enable **User Settings → Advanced → Developer Mode**, right-click the teammate's profile, and choose **Copy User ID**. In Supabase **Authentication → Users**, find that teammate and copy their dashboard UUID. Run this SQL once per teammate:
