@@ -60,3 +60,57 @@
 .settings-card .retention-setting select{width:100%;min-width:0;padding:9px 10px;border:1px solid #333c35;border-radius:7px;background:#151b16;color:inherit;font-size:12px}
 .retention-note{display:block;color:#849087;font-size:11px;line-height:1.5}
 @media(max-width:610px){.settings-card .retention-setting{grid-template-columns:1fr;gap:6px}.stat{grid-template-columns:30px minmax(0,1fr);gap:7px 8px}.task-form aside .assignee{font-size:12px!important}}
+
+/* Refined interaction and motion layer */
+:root{scroll-behavior:smooth;scroll-padding-top:82px;scrollbar-color:#465449 #111512}
+body{scrollbar-gutter:stable;overscroll-behavior-y:contain}
+::selection{background:#739b5c66;color:#f4f8f1}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:#111512}
+::-webkit-scrollbar-thumb{border:3px solid #111512;border-radius:999px;background:#465449}
+::-webkit-scrollbar-thumb:hover{background:#68805f}
+.light{scrollbar-color:#a9b6a7 #f3f5f2}
+.light::-webkit-scrollbar-track{background:#f3f5f2}
+.light::-webkit-scrollbar-thumb{border-color:#f3f5f2;background:#a9b6a7}
+.content{scroll-behavior:smooth;scrollbar-gutter:stable}
+.page-transition{min-height:100%;animation:page-arrive .24s cubic-bezier(.2,.75,.25,1) both;transform-origin:top center}
+@keyframes page-arrive{from{opacity:0;transform:translateY(9px) scale(.997)}to{opacity:1;transform:translateY(0) scale(1)}}
+button,.button,.icon-btn,.nav-item,.top-user,.deadline,.calendar-day button,.month-deadlines button,.add-inline,.add-column{transition:background-color .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease,transform .18s cubic-bezier(.2,.75,.25,1),filter .18s ease}
+.button:hover,.quick>button:hover,.add-inline:hover,.add-column:hover{transform:translateY(-1px)}
+.button:active,.quick>button:active,.nav-item:active,.icon-btn:active{transform:translateY(0) scale(.98)}
+.button.primary{box-shadow:0 5px 14px color-mix(in srgb,var(--accent) 24%,transparent)}
+.button.primary:hover{box-shadow:0 8px 20px color-mix(in srgb,var(--accent) 34%,transparent)}
+.nav-item{position:relative;overflow:hidden}
+.nav-item.active{transition:background .2s ease,box-shadow .2s ease,color .2s ease}
+.nav-item.active::before{position:absolute;inset:5px auto 5px 0;width:3px;border-radius:0 4px 4px 0;background:var(--accent);content:"";opacity:.9}
+.nav-item.active{box-shadow:none}
+.nav-item.active:hover{background:linear-gradient(90deg,#2b4d26,#203522)}
+.panel,.stat,.roadmap-card,.resource-card,.announcement,.member-card,.settings-card,.task-card{transition:border-color .2s ease,box-shadow .2s ease,background-color .2s ease,transform .2s cubic-bezier(.2,.75,.25,1)}
+.task-card:hover,.roadmap-card:hover,.resource-card:hover,.member-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px #0002}
+.deadline:hover,.month-deadlines button:hover{background:color-mix(in srgb,var(--surface) 75%,transparent)}
+.panel-title .text-link:hover,.text-link:hover{color:#c0dfa8}
+input:not([type=checkbox]):not([type=range]),textarea,select{transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease}
+input:not([type=checkbox]):not([type=range]):hover,textarea:hover,select:hover{border-color:#48574a}
+input:not([type=checkbox]):not([type=range]):focus-visible,textarea:focus-visible,select:focus-visible{border-color:#85b66b;box-shadow:0 0 0 3px #85b66b25}
+input[type=checkbox]{-webkit-appearance:none;appearance:none;position:relative;display:inline-grid;width:18px;height:18px;flex:0 0 18px;place-items:center;margin:0;border:1px solid #526052;border-radius:5px;background:#171e18;box-shadow:inset 0 1px 1px #ffffff08;vertical-align:middle;cursor:pointer;transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease}
+input[type=checkbox]::after{width:8px;height:4px;border-bottom:2px solid white;border-left:2px solid white;content:"";opacity:0;transform:translateY(-1px) rotate(-45deg) scale(.65);transition:opacity .13s ease,transform .16s cubic-bezier(.2,.75,.25,1)}
+input[type=checkbox]:hover{border-color:#8cb878;box-shadow:0 0 0 3px #8cb87818}
+input[type=checkbox]:checked{border-color:var(--accent,#5b9145);background:var(--accent,#5b9145);box-shadow:0 2px 8px color-mix(in srgb,var(--accent,#5b9145) 32%,transparent)}
+input[type=checkbox]:checked::after{opacity:1;transform:translateY(-1px) rotate(-45deg) scale(1)}
+input[type=checkbox]:focus-visible{outline:2px solid #9cca80;outline-offset:3px}
+input[type=checkbox]:disabled{opacity:.5;cursor:not-allowed}
+.light input[type=checkbox]{border-color:#aab6a9!important;background:#fff!important}
+.light input[type=checkbox]:checked{border-color:var(--accent,#5b9145)!important;background:var(--accent,#5b9145)!important}
+.toggle-line input[type=checkbox]{width:19px;height:19px;flex-basis:19px;border-radius:6px}
+.assignee input[type=checkbox],.tag-option input[type=checkbox],.check-row input[type=checkbox],.widget-menu input[type=checkbox]{width:17px;height:17px;flex-basis:17px}
+.backdrop{animation:backdrop-arrive .18s ease-out both}
+.modal{animation:modal-arrive .24s cubic-bezier(.2,.75,.25,1) both;transform-origin:center}
+@keyframes backdrop-arrive{from{opacity:0}to{opacity:1}}
+@keyframes modal-arrive{from{opacity:0;transform:translateY(9px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+.toast{animation:toast-arrive .2s cubic-bezier(.2,.75,.25,1) both}
+@keyframes toast-arrive{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+.board{scroll-behavior:smooth;overscroll-behavior-x:contain}
+.board,.modal{scrollbar-color:#465449 transparent}
+.board::-webkit-scrollbar-track,.modal::-webkit-scrollbar-track{background:transparent}
+.board::-webkit-scrollbar-thumb,.modal::-webkit-scrollbar-thumb{border-color:transparent;background:#465449}
+@media(prefers-reduced-motion:reduce){:root{scroll-behavior:auto}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
