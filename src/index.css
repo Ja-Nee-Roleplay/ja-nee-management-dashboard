@@ -322,3 +322,27 @@ button:hover>svg,.button:hover>svg{transform:scale(1.08)}
 .light .stat,.light .overview-grid .panel,.light .quick>button,.light .roadmap-card,.light .settings-card,.light .member-card,.light .resource-card,.light .task-card,.light .announcement,.light .pinned-announcements{border-color:#d9dce1;background:#fff;color:#2e3338}
 .light .event,.light .event b,.light .member-line b{color:#3f434a}
 @media(max-width:610px){.app{--discord-main:#111512}.event>.avatar{width:28px;height:28px;min-width:28px;flex-basis:28px}.event .avatar.small{width:28px;height:28px}}
+
+/* Green Discord-style cards: keep the charcoal structure, bring Ja-Nee's forest palette back. */
+.app:not(.light) .stat,
+.app:not(.light) .overview-grid .panel,
+.app:not(.light) .roadmap-card,
+.app:not(.light) .settings-card,
+.app:not(.light) .member-card,
+.app:not(.light) .resource-card,
+.app:not(.light) .task-card,
+.app:not(.light) .announcement,
+.app:not(.light) .pinned-announcements,
+.app:not(.light) .quick{border-color:#304232;background:linear-gradient(145deg,#1d2a20,#18221a);box-shadow:inset 0 1px #ffffff08,0 8px 22px #0002}
+.app:not(.light) .quick>button{border-color:#304232;background:linear-gradient(145deg,#202d22,#1a251c);color:#dce7d9}
+.app:not(.light) .quick>button:hover,
+.app:not(.light) .task-card:hover,
+.app:not(.light) .roadmap-card:hover,
+.app:not(.light) .resource-card:hover,
+.app:not(.light) .member-card:hover{border-color:#55734a;background:linear-gradient(145deg,#26382a,#1d2b20)}
+.app:not(.light) .column{border-color:#2c3c2e;background:linear-gradient(160deg,#19251b,#151e17)}
+.app:not(.light) .pinned-announcement{border-color:#344735;background:#1a261c}
+.app:not(.light) .panel-title,.app:not(.light) .event{border-color:#304232}
+.app:not(.light) .widget-menu,
+.app:not(.light) .search-results,
+.app:not(.light) .column-menu{border-color:#344735;background:#19231bf2}
