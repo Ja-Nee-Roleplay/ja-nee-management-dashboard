@@ -21,7 +21,7 @@ The publishable key is intended for browser use. Never put a Supabase secret/ser
 
 1. Create a Supabase project.
 2. Open **SQL Editor**, paste and run [`supabase/schema.sql`](supabase/schema.sql) once. It creates the tables, access rules, profile trigger, and realtime workspace updates.
-3. Run [`supabase/announcements_storage.sql`](supabase/announcements_storage.sql) and [`supabase/weekly_activity_cleanup.sql`](supabase/weekly_activity_cleanup.sql) in the SQL Editor. These create private image storage for announcements, a public image bucket for the optional Discord notification thumbnail, and schedule activity-feed cleanup for Mondays at 00:00 South African time. Cleanup clears only `workspace_state.data.events`; tasks and other workspace data are untouched. The cleanup uses Supabase Cron (`pg_cron`). If you already ran the storage SQL, run its updated version again to add the Discord image bucket.
+3. Run [`supabase/project_features.sql`](supabase/project_features.sql), [`supabase/announcements_storage.sql`](supabase/announcements_storage.sql), and [`supabase/weekly_activity_cleanup.sql`](supabase/weekly_activity_cleanup.sql) in the SQL Editor. `project_features.sql` is an additive migration for LOA requests, member GitHub preferences, and their row-level security policies. The other scripts create private announcement-image storage, a public Discord thumbnail bucket, and schedule activity-feed cleanup for Mondays at 00:00 South African time. Cleanup clears only `workspace_state.data.events`; tasks and other workspace data are untouched. The cleanup uses Supabase Cron (`pg_cron`). If you already ran the storage SQL, run its updated version again to add the Discord image bucket.
 4. In **Authentication → URL Configuration**, set the Site URL to the deployed Pages URL:
 
    `https://ja-nee-roleplay.github.io/ja-nee-management-dashboard/`
@@ -45,6 +45,32 @@ The publishable key is intended for browser use. Never put a Supabase secret/ser
    ```
 
 Roles are `owner`, `administrator`, `management`, `developer`, and `viewer`.
+
+## GitHub Projects
+
+Each member can choose **Dashboard**, **GitHub Projects**, or **Both** in **Settings → GitHub Projects**. Preferences are stored per member. Connect using the same GitHub account used to sign in, load projects, choose one, and use **Sync now** when you want to exchange changes. Sync is manual so members can review and resolve simultaneous edits.
+
+Connecting requests GitHub's `project` scope for Project V2 read/write and `read:org` to list organization projects. These scopes are shown on GitHub's consent screen; `project` covers user and organization projects, and `read:org` can read organization membership and team membership. The app does not request repository code access. See [GitHub's OAuth scope reference](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps).
+
+Deploy the authenticated sync function after linking the Supabase CLI:
+
+```sh
+npx supabase functions deploy github-sync
+```
+
+The function verifies the signed-in, approved dashboard member before calling GitHub. It receives the provider token for the requested operation and does not write it to the app's workspace tables. Reconnect after a new session if GitHub access is no longer available.
+
+Sync maps task status, priority, due dates, custom fields with matching names and supported types, and draft issue title/description. Existing GitHub Issues and Pull Requests can import content and sync their Project fields; changing their title or description requires repository write access, which this connection does not request. If both the dashboard task and GitHub item changed since the last sync, the function pauses that item and offers **Use dashboard** or **Use GitHub**. Sync reads up to 500 project items and sends up to 250 dashboard tasks per operation; it stops with an explanation when a project exceeds 500 items so it will not sync from an incomplete item list.
+
+Members who select **GitHub Projects** use the connected project as their task workspace; the dashboard's Task board page becomes a link to that project. **Both** keeps the dashboard editable and enables two-way sync. **Dashboard** leaves GitHub sync off.
+
+## LOA and availability
+
+Members use **Availability** to submit a date range and optional handover message, edit or cancel pending requests, and see active, upcoming, and past requests on the shared team calendar. Owners, administrators, and management can approve or decline requests. Database triggers create in-app notifications for reviewers and requesters. Run `supabase/project_features.sql` before using this page.
+
+## Project views
+
+The Task board supports Board, Table, and Timeline views, saved per-member view presets, filters, sorting and grouping, custom fields, task start and due dates, sub-issues, dependencies, milestones, discussions, activity history, and an optional checklist-completion workflow rule. Existing workspace JSON is normalized with defaults when loaded; no task-data conversion is required.
 
 ## Discord task change cards
 
@@ -89,5 +115,5 @@ The included Pages workflow reads those variables when it builds. Push a commit 
 - Workspace Settings can automatically delete completed tasks after 1, 3, 7, 14, 30, 60, or 90 days. Cleanup runs while an approved member has the dashboard open; overdue cards are removed on the next visit if everyone was offline when the timer elapsed. Choose **Never** to disable it.
 - New accounts remain blocked until an owner approves them. The first owner must be approved in the trusted Supabase SQL Editor.
 - Row-level security protects the database; the browser uses only the publishable key. The Discord webhook and Supabase service credentials remain on the server side.
-- The current app saves one shared workspace JSON document. If several people edit the same item at once, a later database save can replace an earlier one; a later database increment should move the busiest records to separate relational tables.
-- Discord receives workspace activity notices. GitHub OAuth provides sign-in; the dashboard does not sync GitHub Issues or Projects.
+- The dashboard still saves tasks and project views in one shared workspace JSON row. The sync merges item edits where it can, but concurrent writes to the same workspace can still collide. LOA requests and member preferences use separate row-level-security protected tables.
+- Discord receives workspace activity notices. GitHub sign-in uses Supabase Auth; Project V2 synchronization uses the separate protected `github-sync` Edge Function.
